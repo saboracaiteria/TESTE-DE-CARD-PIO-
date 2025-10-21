@@ -278,23 +278,23 @@
             </div>
             <div class="p-6 space-y-6 overflow-y-auto modal-body">
                 <div id="cart-items-container"></div>
-                
-                <div class="space-y-3 pt-4 pb-4 border-t border-gray-700">
-                    <h4 class="text-lg font-bold text-white">Cupom de Desconto</h4>
-                    <div id="coupon-input-group" class="flex gap-2">
-                        <input type="text" id="coupon-code" class="mt-1 block flex-1 bg-gray-800 border-2 border-gray-600 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 p-3 text-base text-white placeholder-gray-400 uppercase" placeholder="Insira o Cupom">
-                        <button id="apply-coupon-btn" class="btn-gradient text-white font-bold py-2 px-4 rounded-lg text-sm flex-shrink-0">Aplicar</button>
+
+                <div id="coupon-section" class="pt-4 border-t border-gray-700">
+                    <h4 class="text-lg font-bold text-white mb-2">Cupom de Desconto</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="coupon-input" class="flex-grow block w-full bg-gray-800 border-2 border-gray-600 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 p-3 text-base text-white placeholder-gray-400 uppercase" placeholder="DIGITE SEU CUPOM">
+                        <button onclick="app.applyCoupon()" class="bg-pink-600 text-white font-bold py-3 px-4 rounded-md hover:bg-pink-700 transition-colors">Aplicar</button>
                     </div>
-                    <div id="coupon-message" class="text-sm pl-1 min-h-[1.25rem]"></div>
-                    <div id="applied-coupon-display" class="hidden flex justify-between items-center bg-gray-800 p-3 rounded-lg border border-pink-500">
-                        <span class="text-pink-400 font-semibold"><i class="fas fa-tag mr-2"></i>Cupom Aplicado: <span id="applied-coupon-code" class="text-white"></span></span>
-                        <button onclick="app.removeCoupon()" class="text-gray-400 hover:text-red-500 text-lg"><i class="fas fa-times"></i></button>
-                    </div>
+                    <p id="coupon-message" class="text-sm mt-2 font-semibold"></p>
                 </div>
                 <div id="cart-summary-details" class="pt-4 mt-4 border-t border-gray-700 space-y-2 hidden">
                       <div class="flex justify-between text-gray-400">
-                          <span>Subtotal</span>
+                          <span>Subtotal dos Itens</span>
                           <span id="cart-subtotal">R$ 0,00</span>
+                      </div>
+                      <div class="flex justify-between text-yellow-400 hidden" id="cart-discount-row">
+                          <span class="font-bold">Desconto (Cupom)</span>
+                          <span id="cart-discount-value" class="font-bold">- R$ 0,00</span>
                       </div>
                       <div class="flex justify-between text-gray-400">
                           <span>Taxa de Entrega</span>
@@ -456,27 +456,27 @@
         countdownInterval: null,
         openingCountdownInterval: null,
         deliveryCountdownInterval: null,
-
-        // --- COUPON STATE & DATA (NOVAS ADIÇÕES) ---
-        coupon: {
-            applied: null, // { code: '...', type: '...', value: 0, message: '...' }
-            usedCoupons: {} // { 'COUPON_CODE': 'YYYY-MM-DD' }
-        },
-        COUPON_STORAGE_KEY: 'saborAcaiteriaUsedCoupons',
-        COUPON_DISCOUNTS: {
-            'TAXA-0': { type: 'free_delivery', value: 0, message: 'Taxa de Entrega Grátis aplicada!' },
-            'SABOR10': { type: 'percentage', value: 0.10, message: '10% de desconto no Subtotal aplicado!' },
-            'SABOR15': { type: 'percentage', value: 0.15, message: '15% de desconto no Subtotal aplicado!' },
-            'SABOR21': { type: 'percentage', value: 0.21, message: '21% de desconto no Subtotal aplicado!' },
-        },
         
+        // --- NEW COUPON STATE ---
+        activeCoupon: null, 
+        couponDiscount: 0,
+        
+        // --- CUPONS E REGRAS (ATUALIZADO PARA INCLUIR SABOR10, SABOR13, SABOR15) ---
+        couponRules: {
+            'TAXAZERO': { type: 'free_delivery', validUntil: '20:30', restriction: 'delivery', description: 'Taxa de entrega grátis! (válido até 20:30h para Delivery)' },
+            'SABOR25': { type: 'percentage_discount', value: 0.25, validUntil: '18:00', restriction: 'takeout', description: '25% de desconto no total dos itens! (válido somente para Retirada até 18:00h)' },
+            // NOVOS CUPONS
+            'SABOR10': { type: 'percentage_discount', value: 0.10, validUntil: null, restriction: 'both', description: '10% de desconto no total dos itens! (Retirada ou Delivery)' },
+            'SABOR13': { type: 'percentage_discount', value: 0.13, validUntil: null, restriction: 'both', description: '13% de desconto no total dos itens! (Retirada ou Delivery)' },
+            'SABOR15': { type: 'percentage_discount', value: 0.15, validUntil: '21:00', restriction: 'both', description: '15% de desconto no total dos itens! (Retirada ou Delivery até 21:00h)' }
+        },
+
         // --- DEFAULT DATA (for initial load or reset) ---
         defaultAdminSettings: {
-            // ALTERADO PARA TESTE: Loja ABERTA
-            storeStatus: 'open', // 'auto', 'open', 'closed'
+            storeStatus: 'auto', // 'auto', 'open', 'closed'
             deliveryMode: 'both', // 'both', 'delivery', 'takeout'
-            openingTime: '10:00', // ALTERADO PARA TESTE
-            closingTime: '23:59', // ALTERADO PARA TESTE
+            openingTime: '15:20',
+            closingTime: '22:30',
             openDays: [0, 1, 2, 3, 4, 5, 6],
             whatsappNumber: '5594991623576',
             address: 'Av. rio Branco. novo Horizonte.. antigo Obba açaí',
@@ -540,6 +540,7 @@
         ADMIN_SETTINGS_STORAGE_KEY: 'saborAcaiteriaAdminSettings',
         PRODUCTS_STORAGE_KEY: 'saborAcaiteriaProducts',
         TOPPINGS_STORAGE_KEY: 'saborAcaiteriaToppings',
+        COUPON_STORAGE_KEY: 'saborAcaiteriaActiveCoupon', // NEW
 
         // --- DOM ELEMENT SELECTORS (cached for performance) ---
         elements: {
@@ -604,21 +605,21 @@
             openingTimer: document.getElementById('opening-timer'),
             deliveryCountdownContainer: document.getElementById('delivery-countdown-container'),
             deliveryCountdownTimer: document.getElementById('delivery-countdown-timer'),
-            // NOVOS ELEMENTOS DO CUPOM
-            couponCodeInput: document.getElementById('coupon-code'),
-            applyCouponBtn: document.getElementById('apply-coupon-btn'),
+            
+            // NEW COUPON ELEMENTS
+            couponInput: document.getElementById('coupon-input'),
             couponMessage: document.getElementById('coupon-message'),
-            appliedCouponDisplay: document.getElementById('applied-coupon-display'),
-            appliedCouponCode: document.getElementById('applied-coupon-code'),
+            cartDiscountRow: document.getElementById('cart-discount-row'),
+            cartDiscountValue: document.getElementById('cart-discount-value'),
         },
 
         // --- HELPER FUNCTIONS ---
-        formatCurrency(value) {
-            return `R$ ${value.toFixed(2).replace('.', ',')}`;
-        },
+        formatCurrency(value) { return `R$ ${value.toFixed(2).replace('.', ',')}`; },
+
         getNextOpeningDate() {
             const now = new Date();
             const [openHour, openMinute] = app.adminSettings.openingTime.split(':').map(Number);
+            
             // Check for opening later today
             if (app.adminSettings.openDays.includes(now.getDay())) {
                 const openingTimeToday = new Date();
@@ -627,23 +628,24 @@
                     return openingTimeToday;
                 }
             }
+            
             // Find the next open day
             for (let i = 1; i <= 7; i++) {
                 const nextDate = new Date();
                 nextDate.setDate(now.getDate() + i);
                 const nextDayOfWeek = nextDate.getDay();
+                
                 if (app.adminSettings.openDays.includes(nextDayOfWeek)) {
                     nextDate.setHours(openHour, openMinute, 0, 0);
                     return nextDate;
                 }
             }
+            
             return null; // Should not happen if at least one day is open
         },
 
         // --- LOCAL STORAGE FUNCTIONS ---
-        saveCart() {
-            localStorage.setItem(app.CART_STORAGE_KEY, JSON.stringify(app.cart));
-        },
+        saveCart() { localStorage.setItem(app.CART_STORAGE_KEY, JSON.stringify(app.cart)); },
         loadCart() {
             const savedCart = localStorage.getItem(app.CART_STORAGE_KEY);
             if (savedCart) app.cart = JSON.parse(savedCart);
@@ -653,9 +655,8 @@
                 name: app.elements.customerNameInput.value,
                 address: app.elements.customerAddressInput.value,
                 neighborhood: app.elements.neighborhoodSelect.value,
-                deliveryOption: document.querySelector('input[name="delivery_option"]:checked')?.value || 'delivery',
-                paymentMethod: app.elements.paymentMethod.value,
-                observations: app.elements.observations.value,
+                deliveryOption: document.querySelector('input[name="delivery_option"]:checked')?.value,
+                couponCode: app.elements.couponInput.value // NEW: Save coupon input
             };
             localStorage.setItem(app.CUSTOMER_INFO_STORAGE_KEY, JSON.stringify(info));
         },
@@ -666,1026 +667,931 @@
                 app.elements.customerNameInput.value = info.name || '';
                 app.elements.customerAddressInput.value = info.address || '';
                 app.elements.neighborhoodSelect.value = info.neighborhood || '';
-                app.elements.paymentMethod.value = info.paymentMethod || 'Pix';
-                app.elements.observations.value = info.observations || '';
-                
-                // Restore delivery option
-                const selectedDeliveryRadio = document.querySelector(`input[name="delivery_option"][value="${info.deliveryOption}"]`);
-                if (selectedDeliveryRadio) {
-                    selectedDeliveryRadio.checked = true;
+                if (info.deliveryOption) {
+                    const radio = document.querySelector(`input[name="delivery_option"][value="${info.deliveryOption}"]`);
+                    if (radio) radio.checked = true;
                 }
-                app.toggleDeliveryFields();
+                app.elements.couponInput.value = info.couponCode || ''; // NEW: Load coupon input
             }
         },
-        loadAdminSettings() {
+        saveCoupon() {
+            localStorage.setItem(app.COUPON_STORAGE_KEY, JSON.stringify(app.activeCoupon));
+        },
+        loadCoupon() {
+            const savedCoupon = localStorage.getItem(app.COUPON_STORAGE_KEY);
+            app.activeCoupon = savedCoupon ? JSON.parse(savedCoupon) : null;
+        },
+        clearCoupon() {
+            app.activeCoupon = null;
+            app.couponDiscount = 0;
+            app.elements.couponInput.value = '';
+            app.elements.couponMessage.textContent = '';
+            localStorage.removeItem(app.COUPON_STORAGE_KEY);
+        },
+        loadLocalData() {
             const savedSettings = localStorage.getItem(app.ADMIN_SETTINGS_STORAGE_KEY);
-            app.adminSettings = savedSettings ? JSON.parse(savedSettings) : app.defaultAdminSettings;
-            app.elements.storeAddressDisplay.textContent = app.adminSettings.address;
-            app.elements.whatsappLink.href = `https://wa.me/${app.adminSettings.whatsappNumber}`;
-            app.elements.messageButtonLink.href = `https://wa.me/${app.adminSettings.whatsappNumber}?text=Olá%20Gostaria%20de%20fazer%20um%20pedido%20de%20açaí.`;
-        },
-        saveAdminSettings() {
-             localStorage.setItem(app.ADMIN_SETTINGS_STORAGE_KEY, JSON.stringify(app.adminSettings));
-        },
-        loadProductsAndToppings() {
+            app.adminSettings = savedSettings ? { ...app.defaultAdminSettings, ...JSON.parse(savedSettings) } : app.defaultAdminSettings;
             const savedProducts = localStorage.getItem(app.PRODUCTS_STORAGE_KEY);
-            const savedToppings = localStorage.getItem(app.TOPPINGS_STORAGE_KEY);
             app.products = savedProducts ? JSON.parse(savedProducts) : app.defaultProducts;
+            const savedToppings = localStorage.getItem(app.TOPPINGS_STORAGE_KEY);
             app.toppings = savedToppings ? JSON.parse(savedToppings) : app.defaultToppings;
         },
-        // FUNÇÕES DO CUPOM
-        loadUsedCoupons() {
-            const savedCoupons = localStorage.getItem(app.COUPON_STORAGE_KEY);
-            if (savedCoupons) app.coupon.usedCoupons = JSON.parse(savedCoupons);
+
+        // --- MODAL & ALERT LOGIC ---
+        openModal(modalElement) {
+            modalElement.classList.remove('hidden');
+            modalElement.classList.add('flex');
+            setTimeout(() => modalElement.classList.remove('opacity-0', 'scale-95'), 10);
         },
-        saveUsedCoupons() {
-            localStorage.setItem(app.COUPON_STORAGE_KEY, JSON.stringify(app.coupon.usedCoupons));
+        closeModal(modalElement) {
+            modalElement.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                modalElement.classList.add('hidden');
+                modalElement.classList.remove('flex');
+            }, 300);
         },
-        isCouponUsedToday(code) {
-            const lastUsedDate = app.coupon.usedCoupons[code];
-            if (!lastUsedDate) return false;
-            const today = new Date().toISOString().split('T')[0];
-            return lastUsedDate === today;
+        showAlert(message, title = 'Atenção!', isError = false) {
+            app.elements.alertMessage.textContent = message;
+            app.elements.alertTitle.textContent = title;
+            app.elements.alertIcon.innerHTML = isError 
+                ? '<i class="fas fa-exclamation-triangle text-red-500 text-5xl"></i>'
+                : '<i class="fas fa-check-circle text-green-500 text-5xl"></i>';
+            app.openModal(app.elements.alertModal);
         },
-        markCouponAsUsed(code) {
-            const today = new Date().toISOString().split('T')[0];
-            app.coupon.usedCoupons[code] = today;
-            app.saveUsedCoupons();
-        },
-        applyCoupon() {
-            const code = app.elements.couponCodeInput.value.toUpperCase().trim();
-            if (!code) {
-                app.elements.couponMessage.innerHTML = '<i class="fas fa-exclamation-triangle mr-1 text-yellow-500"></i><span class="text-yellow-500">Por favor, insira um código de cupom.</span>';
-                return;
+        closeAlertModal() { app.closeModal(app.elements.alertModal); },
+
+        // --- STORE STATUS & COUNTDOWN LOGIC (UNCHANGED) ---
+        renderStoreHoursDisplay() {
+            const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+            let daysString = "Fechado";
+            if (app.adminSettings.openDays.length === 7) daysString = "Todos os dias";
+            else if (app.adminSettings.openDays.length > 0) {
+                daysString = app.adminSettings.openDays.sort((a, b) => a - b).map(dayIndex => dayNames[dayIndex]).join(', ');
             }
+            app.elements.storeHoursDisplay.textContent = `${app.adminSettings.openingTime} às ${app.adminSettings.closingTime} (${daysString})`;
+        },
+
+        startClosingCountdown() {
+            if (app.countdownInterval) clearInterval(app.countdownInterval);
             
-            // Check for empty cart
-            if (app.cart.length === 0) {
-                 app.elements.couponMessage.innerHTML = '<i class="fas fa-exclamation-triangle mr-1 text-yellow-500"></i><span class="text-yellow-500">O carrinho está vazio. Adicione itens antes de usar um cupom.</span>';
-                return;
+            const [closeHour, closeMinute] = app.adminSettings.closingTime.split(':').map(Number);
+            const targetTime = new Date();
+            targetTime.setHours(closeHour, closeMinute, 0, 0);
+
+            // Se o horário de fechamento já passou hoje, significa que é no dia seguinte (loja vira a noite)
+            if (targetTime < new Date()) {
+                targetTime.setDate(targetTime.getDate() + 1);
             }
 
-            const couponData = app.COUPON_DISCOUNTS[code];
-            if (!couponData) {
-                app.elements.couponMessage.innerHTML = '<i class="fas fa-times-circle mr-1 text-red-500"></i><span class="text-red-500">Cupom inválido.</span>';
-                return;
-            }
-            
-            // Check if the coupon has been used today
-            if (app.isCouponUsedToday(code)) {
-                app.elements.couponMessage.innerHTML = '<i class="fas fa-times-circle mr-1 text-red-500"></i><span class="text-red-500">Este cupom já foi utilizado hoje. Limite de 1 por dia.</span>';
-                return;
-            }
+            app.elements.closingTimerContainer.classList.remove('hidden');
+            app.elements.closingTimerContainer.classList.add('flex');
 
-            if (app.coupon.applied && app.coupon.applied.code === code) {
-                app.elements.couponMessage.innerHTML = '<i class="fas fa-info-circle mr-1 text-blue-400"></i><span class="text-blue-400">Este cupom já está aplicado.</span>';
-                return;
-            }
+            app.countdownInterval = setInterval(() => {
+                const now = new Date();
+                const diff = targetTime - now;
 
-            // Apply the coupon
-            app.coupon.applied = {
-                code: code,
-                type: couponData.type,
-                value: couponData.value,
-                message: couponData.message
+                if (diff <= 0) {
+                    app.stopClosingCountdown();
+                    app.checkStoreStatus(); // Re-verifica o status, que agora deve ser "fechado"
+                    return;
+                }
+
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                app.elements.closingTimer.textContent = 
+                    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }, 1000);
+        },
+
+        stopClosingCountdown() {
+            clearInterval(app.countdownInterval);
+            app.countdownInterval = null;
+            app.elements.closingTimerContainer.classList.add('hidden');
+            app.elements.closingTimerContainer.classList.remove('flex');
+        },
+
+        startOpeningCountdown() {
+            if (app.openingCountdownInterval) clearInterval(app.openingCountdownInterval);
+
+            const targetTime = app.getNextOpeningDate();
+            if (!targetTime) return;
+
+            app.elements.openingTimerContainer.classList.remove('hidden');
+            app.elements.openingTimerContainer.classList.add('flex');
+
+            const updateTimer = () => {
+                const now = new Date();
+                const diff = targetTime - now;
+
+                if (diff <= 0) {
+                    app.stopOpeningCountdown();
+                    app.checkStoreStatus(); // Re-check status, it should be open now
+                    return;
+                }
+
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                let timerString = '';
+                if (days > 0) {
+                    timerString = `${days}d ${String(hours).padStart(2, '0')}h`;
+                } else {
+                    timerString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }
+                app.elements.openingTimer.textContent = timerString;
             };
-            app.elements.couponMessage.innerHTML = `<i class="fas fa-check-circle mr-1 text-green-500"></i><span class="text-green-500">${couponData.message}</span>`;
-            app.renderCart();
-        },
-        removeCoupon() {
-            app.coupon.applied = null;
-            app.renderCart();
-        },
-        
-        // --- CORE LOGIC FUNCTIONS ---
-        updateCartCount() {
-            const totalCount = app.cart.reduce((sum, item) => sum + item.quantity, 0);
-            app.elements.cartCountEl.textContent = totalCount;
-            if (totalCount > 0) {
-                app.elements.cartButton.classList.remove('hidden');
-            } else {
-                app.elements.cartButton.classList.add('hidden');
-                // Remove coupon if cart is empty
-                app.removeCoupon();
-            }
-        },
-        calculateItemTotal(item) {
-            let total = item.basePrice * item.quantity;
-            if (item.selectedToppings) {
-                Object.keys(item.selectedToppings).forEach(groupId => {
-                    const group = app.toppings[groupId];
-                    const count = item.selectedToppings[groupId].length;
-                    if (group.price) {
-                        total += count * group.price * item.quantity;
-                    } else if (group.limit && count > group.limit) {
-                        // Charged for extra items beyond the limit
-                        const price = app.toppings.paid_tier2.price || 0; // Assuming R$2.00 price for extra free items
-                        const extraCount = count - group.limit;
-                        total += extraCount * price * item.quantity;
-                    }
-                });
-            }
-            return total;
-        },
-        calculateCartTotal() {
-            let subtotal = app.cart.reduce((sum, item) => sum + app.calculateItemTotal(item), 0);
             
-            // 1. Calculate base delivery fee
-            const selectedNeighborhood = app.elements.neighborhoodSelect.selectedOptions[0];
-            let baseDeliveryFee = 0;
-            if (app.getDeliveryOption() === 'delivery' && selectedNeighborhood && selectedNeighborhood.value) {
-                baseDeliveryFee = parseFloat(selectedNeighborhood.getAttribute('data-fee')) || 0;
+            updateTimer(); // Initial call
+            app.openingCountdownInterval = setInterval(updateTimer, 1000);
+        },
+
+        stopOpeningCountdown() {
+            clearInterval(app.openingCountdownInterval);
+            app.openingCountdownInterval = null;
+            app.elements.openingTimerContainer.classList.add('hidden');
+            app.elements.openingTimerContainer.classList.remove('flex');
+        },
+
+        startDeliveryCountdown() {
+            if (app.deliveryCountdownInterval) clearInterval(app.deliveryCountdownInterval);
+
+            const now = new Date();
+            const currentDay = now.getDay();
+            const isWeekend = (currentDay === 0 || currentDay === 6);
+            const deliveryStartTimeStr = isWeekend ? app.adminSettings.weekendDeliveryStartTime : app.adminSettings.weekdayDeliveryStartTime;
+            
+            const [deliveryHour, deliveryMinute] = deliveryStartTimeStr.split(':').map(Number);
+            const targetTime = new Date();
+            targetTime.setHours(deliveryHour, deliveryMinute, 0, 0);
+
+            if (targetTime < now) {
+                app.stopDeliveryCountdown();
+                return;
             }
+
+            app.elements.deliveryCountdownContainer.classList.remove('hidden');
+            app.elements.deliveryCountdownContainer.classList.add('flex');
             
-            let totalDiscount = 0;
-            let finalDeliveryFee = baseDeliveryFee;
+            const updateTimer = () => {
+                 const now = new Date();
+                const diff = targetTime - now;
+
+                if (diff <= 0) {
+                    app.stopDeliveryCountdown();
+                    app.checkStoreStatus();
+                    return;
+                }
+
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                app.elements.deliveryCountdownTimer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            };
             
-            // 2. Apply Coupon Logic
-            if (app.coupon.applied) {
-                const coupon = app.coupon.applied;
-                if (coupon.type === 'percentage') {
-                    // Percentage discount on subtotal
-                    totalDiscount = subtotal * coupon.value;
-                } else if (coupon.type === 'free_delivery' && baseDeliveryFee > 0) {
-                    // Free delivery (TAXA-0)
-                    finalDeliveryFee = 0;
+            updateTimer();
+            app.deliveryCountdownInterval = setInterval(updateTimer, 1000);
+        },
+
+        stopDeliveryCountdown() {
+            clearInterval(app.deliveryCountdownInterval);
+            app.deliveryCountdownInterval = null;
+            app.elements.deliveryCountdownContainer.classList.add('hidden');
+            app.elements.deliveryCountdownContainer.classList.remove('flex');
+        },
+
+        checkStoreStatus() {
+            const now = new Date();
+            const currentDay = now.getDay();
+            
+            if (app.adminSettings.storeStatus === 'open') app.isStoreOpen = true;
+            else if (app.adminSettings.storeStatus === 'closed') app.isStoreOpen = false;
+            else {
+                const isTodayOpenDay = app.adminSettings.openDays.includes(currentDay);
+                if (!isTodayOpenDay) app.isStoreOpen = false;
+                else {
+                    const [openHour, openMinute] = app.adminSettings.openingTime.split(':').map(Number);
+                    const [closeHour, closeMinute] = app.adminSettings.closingTime.split(':').map(Number);
+                    const openTime = openHour * 60 + openMinute;
+                    const closeTime = closeHour * 60 + closeMinute;
+                    const currentTime = now.getHours() * 60 + now.getMinutes();
+                    if (closeTime < openTime) app.isStoreOpen = (currentTime >= openTime || currentTime <= closeTime);
+                    else app.isStoreOpen = (currentTime >= openTime && currentTime <= closeTime);
                 }
             }
-
-            // Ensure discount does not exceed subtotal
-            totalDiscount = Math.min(totalDiscount, subtotal);
             
-            const total = subtotal - totalDiscount + finalDeliveryFee;
-
-            return { 
-                subtotal, 
-                baseDeliveryFee, 
-                finalDeliveryFee, 
-                totalDiscount, 
-                total 
-            };
-        },
-        renderProducts() {
-            let html = '';
-            app.products.forEach(product => {
-                if (product.disabled) return;
-                const basePrice = product.type === 'combo_selectable_size' ? Math.min(...app.cupSizes.map(s => s.price)) : product.price;
-                const priceDisplay = product.type === 'combo_selectable_size' ? `A partir de ${app.formatCurrency(basePrice)}` : app.formatCurrency(basePrice);
+            const isWeekend = (currentDay === 0 || currentDay === 6);
+            const deliveryStartTimeStr = isWeekend ? app.adminSettings.weekendDeliveryStartTime : app.adminSettings.weekdayDeliveryStartTime;
+            const [deliveryStartHour, deliveryStartMinute] = deliveryStartTimeStr.split(':').map(Number);
+            const deliveryStartTime = deliveryStartHour * 60 + deliveryStartMinute;
+            const currentTime = now.getHours() * 60 + now.getMinutes();
+            app.isDeliveryTime = currentTime >= deliveryStartTime;
+            
+            // Countdown logic
+            if (app.isStoreOpen) {
+                app.stopOpeningCountdown();
+                app.startClosingCountdown();
                 
-                html += `
-                    <div class="product-card bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col justify-between transition-all duration-300 transform" onclick="app.openItemModal(${product.id})">
-                        <div>
-                            <h3 class="text-xl font-bold text-white mb-1">${product.name}</h3>
-                            <p class="text-sm text-gray-400 mb-3">${product.description}</p>
-                        </div>
-                        <div class="flex justify-between items-center mt-2">
-                            <span class="text-lg font-bold instagram-gradient-text">${priceDisplay}</span>
-                            <button class="btn-gradient text-white font-bold py-2 px-4 rounded-lg text-sm">Montar</button>
-                        </div>
-                    </div>
-                `;
-            });
-            app.elements.productList.innerHTML = html;
-        },
-        renderItemModal() {
-            const product = app.currentItem.product;
-            const isCustomAcai = product.type === 'base_acai' || product.type === 'combo';
-
-            app.elements.modalTitle.textContent = `${product.name} ${product.size ? `(${product.size})` : ''}`;
-
-            let contentHtml = '';
-            let currentItemTotal = app.calculateItemTotal(app.currentItem);
-
-            // 1. Quantity Selector
-            contentHtml += `
-                <div class="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
-                    <label class="text-lg font-bold text-white">Quantidade</label>
-                    <div class="flex items-center space-x-3">
-                        <button onclick="app.updateItemQuantity(-1)" class="bg-gray-700 text-white w-8 h-8 rounded-full hover:bg-gray-600 disabled:opacity-50" ${app.currentItem.quantity <= 1 ? 'disabled' : ''}>-</button>
-                        <span id="item-quantity-display" class="text-xl font-bold text-pink-500 w-6 text-center">${app.currentItem.quantity}</span>
-                        <button onclick="app.updateItemQuantity(1)" class="bg-gray-700 text-white w-8 h-8 rounded-full hover:bg-gray-600">+</button>
-                    </div>
-                </div>
-            `;
-            
-            // 2. Toppings Section (Only for Açaí Base and Combos that allow customization)
-            if (isCustomAcai || product.type === 'combo_selectable_size') {
-                Object.keys(app.toppings).forEach(groupKey => {
-                    const group = app.toppings[groupKey];
-                    let toppingLimit = group.limit || 0; 
-                    
-                    // Custom limits for specific products (like Barca)
-                    if (product.customToppingLimits && product.customToppingLimits[groupKey] !== undefined) {
-                        toppingLimit = product.customToppingLimits[groupKey];
-                    }
-
-                    const selectedItems = app.currentItem.selectedToppings[groupKey] || [];
-                    const selectedCount = selectedItems.length;
-                    const isPaidGroup = group.price && group.price > 0;
-                    
-                    let limitText = '';
-                    let chargeText = '';
-                    let countColor = selectedCount > toppingLimit ? 'text-red-400 font-bold' : 'text-green-400';
-
-                    if (isPaidGroup) {
-                        chargeText = `(+ ${app.formatCurrency(group.price)} cada)`;
-                    } else if (toppingLimit > 0) {
-                        limitText = `(Grátis até ${toppingLimit} itens)`;
-                        if (selectedCount > toppingLimit) {
-                            const extraCost = (selectedCount - toppingLimit) * (app.toppings.paid_tier2.price || 2.00);
-                            chargeText = `(+ ${app.formatCurrency(extraCost)} por excedente)`;
-                        }
-                    } else if (groupKey === 'caldas') {
-                         limitText = `(Grátis, escolha até 1)`;
-                    }
-
-                    contentHtml += `
-                        <div class="space-y-3 p-4 bg-gray-800 rounded-lg border border-gray-700">
-                            <div class="flex justify-between items-center mb-2">
-                                <h4 class="text-lg font-bold text-white">${group.title.split('(')[0].trim()}</h4>
-                                <span class="text-sm text-gray-400">${limitText} ${chargeText}</span>
-                            </div>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                ${group.items.map(item => `
-                                    <label class="flex items-center space-x-2 cursor-pointer p-2 bg-gray-900 rounded-md border border-gray-800 hover:border-pink-500 transition-colors">
-                                        <input type="checkbox" data-group="${groupKey}" data-item="${item.name}" onchange="app.toggleTopping(event, '${groupKey}')" class="h-4 w-4 text-pink-500 border-gray-600 rounded focus:ring-pink-500" ${selectedItems.includes(item.name) ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
-                                        <span class="text-sm text-gray-300 ${item.disabled ? 'line-through text-gray-500' : ''}">${item.name}</span>
-                                    </label>
-                                `).join('')}
-                            </div>
-                            <p class="text-sm ${countColor}">Selecionados: <span id="topping-count-${groupKey}">${selectedCount}</span></p>
-                        </div>
-                    `;
-                });
-            } else if (product.type === 'combo_selectable_size') {
-                contentHtml += `<p class="text-center text-lg text-gray-400 p-4">Este item é um combo pré-selecionado e não permite personalização de acompanhamentos.</p>`;
+                if (!app.isDeliveryTime && ['both', 'delivery'].includes(app.adminSettings.deliveryMode)) {
+                    app.startDeliveryCountdown();
+                } else {
+                    app.stopDeliveryCountdown();
+                }
+            } else { // Store is closed
+                app.stopClosingCountdown();
+                app.stopDeliveryCountdown();
+                app.startOpeningCountdown();
             }
 
+            const indicator = app.elements.storeStatusIndicator;
+            indicator.textContent = app.isStoreOpen ? 'Aberto' : 'Fechado';
+            indicator.className = `ml-2 px-2 py-0.5 text-xs rounded-full font-semibold ${app.isStoreOpen ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`;
 
-            app.elements.modalBody.innerHTML = contentHtml;
-            app.elements.modalItemTotal.textContent = app.formatCurrency(currentItemTotal);
-            app.elements.addToCartBtn.textContent = app.currentItem.cartIndex !== null ? 'Atualizar Carrinho' : 'Adicionar ao Carrinho';
-        },
-        renderCart() {
-            const { subtotal, baseDeliveryFee, finalDeliveryFee, totalDiscount, total } = app.calculateCartTotal();
+            const statusBanner = app.elements.storeStatusBanner;
+            if (!app.isStoreOpen) {
+                statusBanner.innerHTML = `<div class="bg-red-900 bg-opacity-50 border border-red-700 text-red-300 p-3 rounded-lg text-center text-sm"><p class="font-bold">Estamos fechados!</p><p>O cardápio está disponível para visualização.</p></div>`;
+                statusBanner.classList.remove('hidden');
+            } else {
+                statusBanner.classList.add('hidden');
+            }
+
+            const deliveryBanner = app.elements.deliveryTimeBanner;
+            if (!app.isDeliveryTime && app.isStoreOpen && ['both', 'delivery'].includes(app.adminSettings.deliveryMode)) {
+                deliveryBanner.innerHTML = `<div class="bg-blue-900 bg-opacity-50 border border-blue-700 text-blue-300 p-3 rounded-lg text-center text-sm"><p class="font-bold">Entregas a partir das ${deliveryStartTimeStr}h!</p><p>Pedidos para retirada já estão disponíveis.</p></div>`;
+                deliveryBanner.classList.remove('hidden');
+            } else {
+                deliveryBanner.classList.add('hidden');
+            }
             
-            app.elements.cartTotalEl.textContent = app.formatCurrency(total);
-            app.updateCartCount();
+            app.renderStoreHoursDisplay();
+            app.renderProducts();
+            app.renderDeliveryOptions();
+            app.renderCart();
+        },
 
-            // Render Cart Items
-            let itemsHtml = app.cart.length === 0 ? '<p class="text-center text-gray-500">Seu carrinho está vazio.</p>' : '';
-            if (app.cart.length > 0) {
-                app.elements.checkoutForm.classList.remove('hidden');
-                app.elements.summaryDetails.classList.remove('hidden');
-                itemsHtml = app.cart.map((item, index) => {
-                    const itemTotal = app.calculateItemTotal(item);
-                    let toppingsList = item.selectedToppings ? Object.keys(item.selectedToppings).map(groupKey => {
-                        const items = item.selectedToppings[groupKey];
-                        if (items.length === 0) return '';
-                        const group = app.toppings[groupKey];
-                        const count = items.length;
-                        let extraCharge = '';
-                        // Calculate extra charge for 'free' groups if over limit
-                        if (group.limit && count > group.limit && !group.price) {
-                             const pricePerExtra = app.toppings.paid_tier2.price || 0;
-                             const extraCount = count - group.limit;
-                             extraCharge = ` (+ ${app.formatCurrency(extraCount * pricePerExtra * item.quantity)})`;
-                        }
-                        
-                        // Calculate price for paid groups
-                        let paidCharge = '';
-                        if (group.price) {
-                            paidCharge = ` (+ ${app.formatCurrency(group.price * count * item.quantity)})`;
-                        }
+        // --- RENDER FUNCTIONS (renderCart atualizada para os novos cupons) ---
+        renderProducts() {
+            app.elements.productList.innerHTML = '';
+            const mostOrderedIds = [2, 5, 8, 10, 12, 19];
 
-                        return `
-                            <p class="text-xs text-gray-500 ml-3 mt-1">
-                                <span class="font-semibold">${group.title.split('(')[0].trim()}:</span> ${items.join(', ')} <span class="text-yellow-500">${extraCharge}</span><span class="text-yellow-500">${paidCharge}</span>
-                            </p>
-                        `;
-                    }).filter(t => t).join('') : '';
+            app.products.forEach(product => {
+                const isCombo = product.type === 'combo_selectable_size';
+                const isCup = product.name.toLowerCase().includes('copo');
+                const isKit = product.name.toLowerCase().includes('kit') || product.name.toLowerCase().includes('namorados') || product.name.toLowerCase().includes('kids');
+                const isBarca = product.name.toLowerCase().includes('barca');
 
-                    return `
-                        <div class="flex justify-between items-start bg-gray-800 p-4 rounded-lg shadow">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-lg font-semibold text-white">${item.quantity}x ${item.name} (${item.size || item.product.name})</p>
-                                ${toppingsList}
+                let onclickHandler = product.disabled ? '' : (isCombo ? `onclick="app.openComboSizeModal('${product.id}')"` : `onclick="app.openItemModal('${product.id}', ${product.price}, '')"`);
+                
+                let priceDisplay;
+                if (isCombo) {
+                    const sizesToUse = product.sizesKey && app[product.sizesKey] ? app[product.sizesKey] : app.cupSizes;
+                    const startingPrice = sizesToUse.length > 0 ? sizesToUse[0].price : 0;
+                    priceDisplay = `<span class="text-xs text-gray-400">A partir de</span><strong class="block text-base text-gray-100">${app.formatCurrency(startingPrice)}</strong>`;
+                } else {
+                    priceDisplay = `<strong class="text-base font-bold text-gray-100">${app.formatCurrency(product.price)}</strong>`;
+                }
+                
+                let cardContainerClasses = (isCup || isKit) 
+                    ? 'border-2 border-pink-500 shadow-lg shadow-pink-500/20'
+                    : 'border border-gray-700';
+                if (isBarca) {
+                    cardContainerClasses = 'border-2 border-amber-400 shadow-lg shadow-amber-400/20';
+                }
+                const spanClass = '';
+
+                const isMostOrdered = mostOrderedIds.includes(product.id);
+                const mostOrderedTag = isMostOrdered 
+                    ? `<div class="absolute -top-2.5 -right-2.5 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg transform rotate-12 z-10">MAIS PEDIDO!</div>` 
+                    : '';
+
+                const productCard = `
+                    <div class="product-card group relative cursor-pointer bg-gray-900 rounded-lg p-3 flex flex-col justify-between h-full transition-all duration-200 hover:shadow-xl hover:border-pink-500/50 ${spanClass} ${cardContainerClasses}" ${onclickHandler}>
+                        ${mostOrderedTag}
+                        <div>
+                            <h3 class="font-bold text-gray-100 text-base leading-tight">${product.name}</h3>
+                            ${product.description ? `<p class="text-xs text-gray-400 mt-1">${product.description.replace('Sugestão: ','')}</p>` : ''}
+                        </div>
+                        <div class="flex justify-between items-center mt-3">
+                            <div class="text-left">
+                                ${priceDisplay}
                             </div>
-                            <div class="ml-4 text-right flex flex-col items-end min-w-[70px]">
-                                <span class="text-xl font-bold text-pink-500">${app.formatCurrency(itemTotal)}</span>
-                                <div class="flex gap-2 mt-2">
-                                    <button onclick="app.editCartItem(${index})" class="text-gray-400 hover:text-blue-400" title="Editar"><i class="fas fa-edit"></i></button>
-                                    <button onclick="app.removeCartItem(${index})" class="text-gray-400 hover:text-red-500" title="Remover"><i class="fas fa-trash-alt"></i></button>
-                                </div>
+                            <div class="btn-gradient text-white font-bold py-1 px-3 rounded-lg flex items-center gap-1.5 text-sm transform group-hover:scale-105 transition-transform">
+                                <span>Montar</span>
+                                <i class="fas fa-arrow-right fa-xs"></i>
                             </div>
                         </div>
-                    `;
-                }).join('<div class="h-4"></div>');
+                        ${product.disabled ? `<div class="absolute inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center rounded-lg cursor-not-allowed"><span class="text-gray-200 font-bold text-sm bg-gray-700 px-3 py-1 rounded-full shadow-sm">Indisponível</span></div>` : ''}
+                    </div>
+                `;
+
+                app.elements.productList.innerHTML += productCard;
+            });
+        },
+
+
+        renderCart() {
+            // 1. Calculate Subtotal
+            const subtotal = app.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            // 2. Determine Delivery Option and Fee
+            const deliveryOption = document.querySelector('input[name="delivery_option"]:checked')?.value;
+            let baseDeliveryFee = 0;
+            if (deliveryOption === 'delivery' && subtotal > 0) {
+                const selectedOption = app.elements.neighborhoodSelect.options[app.elements.neighborhoodSelect.selectedIndex];
+                baseDeliveryFee = parseFloat(selectedOption.dataset.fee || 0);
+            }
+            let finalDeliveryFee = baseDeliveryFee;
+
+            // 3. Apply Coupon Logic
+            app.couponDiscount = 0;
+            let couponMessageText = '';
+            let couponMessageClass = 'text-gray-400';
+            
+            if (app.activeCoupon) {
+                const couponCode = app.activeCoupon;
+                const coupon = app.couponRules[couponCode];
+                const now = new Date();
+                let isValid = true;
+                let restrictionFailMessage = null;
+                
+                // 3a. Check Delivery/Takeout Restriction
+                if (coupon.restriction !== 'both' && coupon.restriction !== deliveryOption) {
+                    isValid = false;
+                    restrictionFailMessage = `Cupom **${couponCode}** é válido somente para **${coupon.restriction === 'delivery' ? 'Entrega' : 'Retirada na Loja'}**.`;
+                }
+
+                // 3b. Check Time Restriction (validUntil)
+                if (isValid && coupon.validUntil) {
+                    const [validHour, validMinute] = coupon.validUntil.split(':').map(Number);
+                    const validUntilTime = new Date();
+                    validUntilTime.setHours(validHour, validMinute, 0, 0);
+
+                    if (now > validUntilTime) {
+                        isValid = false;
+                        restrictionFailMessage = `Cupom **${couponCode}** expirou. Válido somente até ${coupon.validUntil}h.`;
+                    }
+                }
+                
+                // 3c. Apply Discount/Free Delivery or Clear Coupon
+                if (isValid) {
+                    if (coupon.type === 'free_delivery' && deliveryOption === 'delivery') {
+                        finalDeliveryFee = 0;
+                        couponMessageText = `Cupom **${couponCode}** aplicado! Taxa de entrega grátis.`;
+                        couponMessageClass = 'text-green-400';
+                    } else if (coupon.type === 'percentage_discount') {
+                        app.couponDiscount = subtotal * coupon.value;
+                        couponMessageText = `Cupom **${couponCode}** aplicado! Você ganhou ${coupon.value * 100}% de desconto.`;
+                        couponMessageClass = 'text-green-400';
+                    } else {
+                        isValid = false;
+                        restrictionFailMessage = `Cupom **${couponCode}** inválido para esta opção de pedido.`;
+                    }
+                }
+
+                // If not valid, clear coupon and set error message
+                if (!isValid) {
+                    couponMessageText = restrictionFailMessage;
+                    couponMessageClass = 'text-red-400';
+                    app.clearCoupon(); // Clear invalid coupon
+                }
             } else {
+                 couponMessageText = 'Nenhum cupom aplicado.';
+                 app.elements.couponInput.value = '';
+            }
+
+            // 4. Calculate Final Total
+            const finalTotal = subtotal - app.couponDiscount + finalDeliveryFee;
+
+            // 5. Render Cart Items
+            if (app.cart.length === 0) {
+                app.elements.cartItemsContainer.innerHTML = '<p class="text-gray-400 text-center">Seu carrinho está vazio.</p>';
                 app.elements.checkoutForm.classList.add('hidden');
                 app.elements.summaryDetails.classList.add('hidden');
-            }
-            app.elements.cartItemsContainer.innerHTML = itemsHtml;
-
-
-            // --- Render Summary Details with Discount ---
-            
-            // Check if a percentage discount was applied
-            let discountDisplay = '';
-            if (totalDiscount > 0) {
-                discountDisplay = `
-                    <div class="flex justify-between text-pink-400 font-semibold">
-                        <span>Desconto (${app.coupon.applied.code})</span>
-                        <span class="text-lg">- ${app.formatCurrency(totalDiscount)}</span>
-                    </div>
-                `;
-            }
-
-            // Update delivery fee display logic
-            let feeDisplay;
-            if (finalDeliveryFee === 0 && baseDeliveryFee > 0) {
-                feeDisplay = `<span class="text-green-400">GRÁTIS (${app.coupon.applied.code})</span>`;
-            } else if (finalDeliveryFee === 0 && baseDeliveryFee === 0) {
-                feeDisplay = 'R$ 0,00';
+                app.clearCoupon(); // Ensure coupon is cleared if cart is empty
             } else {
-                feeDisplay = app.formatCurrency(finalDeliveryFee);
+                app.elements.checkoutForm.classList.remove('hidden');
+                app.elements.summaryDetails.classList.remove('hidden');
+                app.elements.cartItemsContainer.innerHTML = app.cart.map((item, index) => {
+                    let toppingsDisplay = '';
+                    if (item.type === 'base_acai') {
+                        toppingsDisplay = item.toppings.length > 0
+                        ? item.toppings.map(t => `<span>- ${t.name} ${t.price > 0 ? `(+${app.formatCurrency(t.price)})` : ''}</span>`).join('<br>')
+                        : '<span>- Açaí puro</span>';
+                    } else if (item.type === 'combo_selectable_size') {
+                        toppingsDisplay = `<span>Tamanho: ${item.selectedSize}</span><br><span>${item.description.replace('Sugestão: ', '')}</span>`;
+                    }
+                    return `
+                        <div class="flex items-start justify-between py-4 border-b border-gray-700">
+                            <div>
+                                <p class="font-bold text-md text-gray-100">${item.quantity}x ${item.name}</p>
+                                <div class="text-sm text-gray-400 mt-1">${toppingsDisplay}</div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-md text-gray-100">${app.formatCurrency(item.price * item.quantity)}</p>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <button onclick="app.updateQuantity(${index}, -1)" class="bg-gray-700 text-white w-7 h-7 rounded-md font-bold">-</button>
+                                    <span class="font-bold w-5 text-center">${item.quantity}</span>
+                                    <button onclick="app.updateQuantity(${index}, 1)" class="bg-gray-700 text-white w-7 h-7 rounded-md font-bold">+</button>
+                                    <button onclick="app.removeFromCart(${index})" class="text-red-500 hover:text-red-400 ml-2"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+            
+            // 6. Render Summary and Coupon Message
+            app.elements.cartSubtotal.textContent = app.formatCurrency(subtotal);
+            app.elements.cartDeliveryFee.textContent = app.formatCurrency(finalDeliveryFee);
+            app.elements.cartTotalEl.textContent = app.formatCurrency(finalTotal);
+            
+            app.elements.couponMessage.textContent = couponMessageText.replace(/\*\*(.*?)\*\*/g, '$1');
+            app.elements.couponMessage.className = `text-sm mt-2 font-semibold ${couponMessageClass}`;
+            
+            app.elements.cartDiscountRow.classList.toggle('hidden', app.couponDiscount === 0);
+            app.elements.cartDiscountValue.textContent = `- ${app.formatCurrency(app.couponDiscount)}`;
+
+            const finalizeBtn = document.querySelector('button[onclick="app.finalizeOrder()"]');
+            if(finalizeBtn){
+                finalizeBtn.disabled = !app.isStoreOpen || app.cart.length === 0;
+                finalizeBtn.classList.toggle('opacity-50', finalizeBtn.disabled);
+                finalizeBtn.classList.toggle('cursor-not-allowed', finalizeBtn.disabled);
+            }
+            app.updateCartIcon();
+        },
+
+        renderDeliveryOptions() {
+            // ... (Função renderDeliveryOptions inalterada, mas chama renderCart) ...
+            const deliveryRadio = app.elements.deliveryOptionDelivery.querySelector('input');
+            const takeoutRadio = app.elements.deliveryOptionTakeout.querySelector('input');
+            
+            app.elements.deliveryOptionDelivery.classList.add('hidden');
+            deliveryRadio.disabled = true;
+            app.elements.deliveryOptionTakeout.classList.add('hidden');
+            takeoutRadio.disabled = true;
+
+            let availableOptions = [];
+            if (['both', 'delivery'].includes(app.adminSettings.deliveryMode)) {
+                app.elements.deliveryOptionDelivery.classList.remove('hidden');
+                deliveryRadio.disabled = false;
+                availableOptions.push('delivery');
+            }
+            if (['both', 'takeout'].includes(app.adminSettings.deliveryMode)) {
+                app.elements.deliveryOptionTakeout.classList.remove('hidden');
+                takeoutRadio.disabled = false;
+                availableOptions.push('takeout');
             }
 
-            // Rebuild cart-summary-details content
-            app.elements.summaryDetails.innerHTML = `
-                <div class="flex justify-between text-gray-400">
-                    <span>Subtotal</span>
-                    <span id="cart-subtotal">${app.formatCurrency(subtotal)}</span>
+            if (!app.isDeliveryTime && ['both', 'delivery'].includes(app.adminSettings.deliveryMode)) {
+                deliveryRadio.disabled = true;
+                app.elements.deliveryOptionDelivery.classList.add('opacity-50', 'cursor-not-allowed');
+                availableOptions = availableOptions.filter(o => o !== 'delivery');
+            } else {
+                 app.elements.deliveryOptionDelivery.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            const currentSelected = document.querySelector('input[name="delivery_option"]:checked');
+            if (!currentSelected || currentSelected.disabled) {
+                if (availableOptions.includes('takeout') && !takeoutRadio.disabled) takeoutRadio.checked = true;
+                else if (availableOptions.includes('delivery') && !deliveryRadio.disabled) deliveryRadio.checked = true;
+            }
+            app.toggleDeliveryFields();
+        },
+
+        toggleDeliveryFields() {
+            const deliveryOption = document.querySelector('input[name="delivery_option"]:checked')?.value;
+            app.elements.deliveryFields.classList.toggle('hidden', deliveryOption === 'takeout' || !deliveryOption);
+            app.renderCart();
+        },
+
+        // --- COUPON LOGIC (ajustado para melhor feedback) ---
+        applyCoupon() {
+            app.saveCustomerInfo(); // Save coupon code in input field
+            const couponCode = app.elements.couponInput.value.toUpperCase().trim();
+            app.clearCoupon(); // Clear current active coupon first
+            
+            if (!couponCode) {
+                app.elements.couponMessage.textContent = 'Digite um cupom.';
+                app.elements.couponMessage.className = 'text-sm mt-2 font-semibold text-red-400';
+                app.renderCart();
+                return;
+            }
+
+            const coupon = app.couponRules[couponCode];
+
+            if (!coupon) {
+                app.elements.couponMessage.textContent = `Cupom **${couponCode}** é inválido.`;
+                app.elements.couponMessage.className = 'text-sm mt-2 font-semibold text-red-400';
+                app.renderCart();
+                return;
+            }
+
+            // Coupon found, now set it and let renderCart validate rules and apply the discount.
+            app.activeCoupon = couponCode;
+            app.saveCoupon();
+
+            // renderCart will validate and update UI/Totals
+            app.renderCart(); 
+
+            // Check if renderCart cleared the coupon (due to rule violation)
+            if (app.activeCoupon) {
+                 app.showAlert(`Cupom ${couponCode} aplicado com sucesso!`, 'Sucesso');
+            } else {
+                 // If coupon was cleared in renderCart due to rule violation, the message is already set.
+                 // We don't need a second alert here, the visual message is enough.
+            }
+        },
+
+
+        // --- COMBO & ITEM MODAL (UNCHANGED) ---
+        openComboSizeModal(productId) {
+            if (!app.isStoreOpen) {
+                app.showAlert('A loja está fechada e não é possível montar pedidos agora.', 'Loja Fechada', true);
+                return;
+            }
+            app.selectedComboProductId = productId;
+            const product = app.products.find(p => p.id.toString() === productId.toString());
+            if (!product) return;
+
+            const sizesToUse = product.sizesKey && app[product.sizesKey] ? app[product.sizesKey] : app.cupSizes;
+
+            app.elements.comboSizeModalTitle.textContent = `Escolha o Tamanho para ${product.name}`;
+            app.elements.comboSizeModalBody.innerHTML = sizesToUse.map(size => `
+                <label>
+                    <input type="radio" name="combo_size" value="${size.name}" data-price="${size.price}" class="hidden">
+                    <div class="flex items-center justify-between p-3 border-2 border-gray-600 rounded-lg cursor-pointer transition-all">
+                        <span class="font-semibold text-gray-200">${size.name}</span>
+                        <span class="text-sm text-gray-400">${app.formatCurrency(size.price)}</span>
+                    </div>
+                </label>
+            `).join('') + `
+                <div class="mt-6 space-y-2">
+                    <h4 class="text-lg font-bold text-gray-100 text-center">Quantidade</h4>
+                    <div class="flex items-center justify-center gap-4">
+                        <button onclick="app.updateComboModalQuantity(-1)" class="bg-gray-700 text-white w-10 h-10 rounded-full font-bold text-xl flex items-center justify-center hover:bg-gray-600 transition-colors">-</button>
+                        <span id="combo-modal-quantity" class="font-bold text-3xl text-white w-12 text-center">1</span>
+                        <button onclick="app.updateComboModalQuantity(1)" class="bg-gray-700 text-white w-10 h-10 rounded-full font-bold text-xl flex items-center justify-center hover:bg-gray-600 transition-colors">+</button>
+                    </div>
                 </div>
-                ${discountDisplay}
-                <div class="flex justify-between text-gray-400 ${totalDiscount > 0 ? 'border-t border-gray-700 pt-2' : ''}">
-                    <span>Taxa de Entrega</span>
-                    <span id="cart-delivery-fee">${feeDisplay}</span>
+            `;
+
+            app.elements.comboSizeModalBody.querySelectorAll('input[name="combo_size"]').forEach(radio => {
+                radio.addEventListener('change', () => { app.elements.selectComboSizeBtn.disabled = false; });
+            });
+            app.elements.selectComboSizeBtn.disabled = true;
+            app.elements.selectComboSizeBtn.onclick = () => {
+                const selected = document.querySelector('input[name="combo_size"]:checked');
+                const quantity = parseInt(document.getElementById('combo-modal-quantity').textContent);
+                if (selected) {
+                    const comboProduct = app.products.find(p => p.id.toString() === app.selectedComboProductId.toString());
+                    app.currentItem = {
+                        id: comboProduct.id, name: comboProduct.name,
+                        basePrice: parseFloat(selected.dataset.price), price: parseFloat(selected.dataset.price),
+                        quantity: quantity, toppings: [], type: comboProduct.type,
+                        selectedSize: selected.value, description: comboProduct.description
+                    };
+                    app.addToCart(); // We call addToCart which now handles quantity correctly
+                    app.closeComboSizeModal();
+                }
+            };
+            app.openModal(app.elements.comboSizeModal);
+        },
+        closeComboSizeModal() { app.closeModal(app.elements.comboSizeModal); app.selectedComboProductId = null; },
+
+        openItemModal(productId, basePrice, sizeName = '') {
+            if (!app.isStoreOpen) {
+                app.showAlert('A loja está fechada e não é possível montar pedidos agora.', 'Loja Fechada', true);
+                return;
+            }
+            const product = app.products.find(p => p.id.toString() === productId.toString());
+            if (!product) return;
+
+            app.currentItem = {
+                id: productId, name: product.name, basePrice: basePrice, price: basePrice, 
+                quantity: 1, toppings: [], type: product.type, selectedSize: sizeName
+            };
+            if (product.customToppingLimits) {
+                app.currentItem.customToppingLimits = product.customToppingLimits;
+            }
+
+            app.elements.modalTitle.textContent = sizeName ? `Monte seu ${product.name} (${sizeName})` : `Monte sua ${product.name}`;
+            
+            // Add quantity selector first
+            app.elements.modalBody.innerHTML = `
+                <div class="space-y-2 mb-6 border-b border-gray-700 pb-6">
+                    <h4 class="text-lg font-bold text-gray-100 text-center">Quantidade</h4>
+                    <div class="flex items-center justify-center gap-4">
+                        <button onclick="app.updateModalQuantity(-1)" class="bg-gray-700 text-white w-10 h-10 rounded-full font-bold text-xl flex items-center justify-center hover:bg-gray-600 transition-colors">-</button>
+                        <span id="modal-quantity" class="font-bold text-3xl text-white w-12 text-center">${app.currentItem.quantity}</span>
+                        <button onclick="app.updateModalQuantity(1)" class="bg-gray-700 text-white w-10 h-10 rounded-full font-bold text-xl flex items-center justify-center hover:bg-gray-600 transition-colors">+</button>
+                    </div>
                 </div>
             `;
             
-            // Update the Coupon Display (The new HTML elements added)
-            if (app.coupon.applied) {
-                app.elements.appliedCouponCode.textContent = app.coupon.applied.code;
-                app.elements.appliedCouponDisplay.classList.remove('hidden');
-                app.elements.couponCodeInput.parentElement.classList.add('hidden'); // Hide input group
-                app.elements.couponMessage.innerHTML = `<i class="fas fa-check-circle mr-1 text-green-500"></i><span class="text-green-500">${app.coupon.applied.message}</span>`;
-            } else {
-                app.elements.appliedCouponDisplay.classList.add('hidden');
-                app.elements.couponCodeInput.parentElement.classList.remove('hidden'); // Show input group
-                app.elements.couponMessage.textContent = '';
-                app.elements.couponCodeInput.value = ''; // Clear input field
-            }
-        },
-        toggleCartModal() {
-            if (app.elements.cartModal.classList.contains('hidden')) {
-                app.elements.cartModal.classList.add('flex');
-                app.elements.cartModal.classList.remove('hidden');
-                app.renderCart();
-            } else {
-                app.elements.cartModal.classList.remove('flex');
-                app.elements.cartModal.classList.add('hidden');
-            }
-        },
-        finalizeOrder() {
-            app.saveCustomerInfo();
-            
-            if (app.cart.length === 0) {
-                app.showAlert('O carrinho está vazio!', 'Atenção', 'fas fa-exclamation-triangle text-yellow-500 text-5xl');
-                return;
-            }
-            if (!app.elements.customerNameInput.value) {
-                app.showAlert('Por favor, preencha seu nome.', 'Atenção', 'fas fa-exclamation-triangle text-yellow-500 text-5xl');
-                return;
-            }
-            if (app.getDeliveryOption() === 'delivery' && (!app.elements.neighborhoodSelect.value || !app.elements.customerAddressInput.value)) {
-                app.showAlert('Por favor, selecione o bairro e preencha o endereço completo para delivery.', 'Atenção', 'fas fa-exclamation-triangle text-yellow-500 text-5xl');
-                return;
+            if (product.type.includes('combo')) {
+                app.elements.modalBody.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg text-sm text-gray-300"><p class="font-bold">Este combo sugere:</p><p>${product.description.replace('Sugestão: ', '')}</p></div>`;
             }
 
-            // Mark coupon as used *before* generating confirmation and sending, to prevent re-use today.
-            if (app.coupon.applied) {
-                app.markCouponAsUsed(app.coupon.applied.code);
-            }
-            
-            app.whatsAppMessage = app.generateWhatsAppMessage();
-            app.renderOrderSummary();
-            app.toggleCartModal(); // Close cart modal
-            app.openConfirmationModal(); // Open confirmation modal
-        },
-        generateWhatsAppMessage() {
-            const customerName = app.elements.customerNameInput.value.trim();
-            const deliveryOption = app.getDeliveryOption();
-            const paymentMethod = app.elements.paymentMethod.value;
-            const observations = app.elements.observations.value.trim();
-            const { subtotal, finalDeliveryFee, total, baseDeliveryFee, totalDiscount } = app.calculateCartTotal();
+            Object.entries(app.toppings).forEach(([key, category]) => {
+                const limit = app.currentItem.customToppingLimits?.[key] || category.limit;
+                let categoryTitle = category.title;
 
-            let message = `*PEDIDO SABOR AÇAÍTERIA*\n\n`;
-            message += `*Cliente*: ${customerName}\n`;
-            
-            // Order Items
-            message += `\n*--- ITENS DO PEDIDO (${app.cart.length} itens) ---*\n`;
-            app.cart.forEach((item, index) => {
-                const itemTotal = app.calculateItemTotal(item);
-                let toppingsText = '';
-                if (item.selectedToppings) {
-                    toppingsText = Object.keys(item.selectedToppings).map(groupKey => {
-                        const items = item.selectedToppings[groupKey];
-                        if (items.length === 0) return '';
-                        const group = app.toppings[groupKey];
-                        const count = items.length;
-                        
-                        // Check for charged items (paid group or extra free items)
-                        let extraInfo = '';
-                        if (group.price) {
-                            extraInfo = ` (R$ ${group.price.toFixed(2).replace('.', ',')} cada)`;
-                        } else if (group.limit && count > group.limit) {
-                            const pricePerExtra = app.toppings.paid_tier2.price || 0;
-                            const extraCount = count - group.limit;
-                            extraInfo = ` (${extraCount} extra(s) +R$ ${pricePerExtra.toFixed(2).replace('.', ',')} cada)`;
-                        }
-                        
-                        return `   • ${group.title.split('(')[0].trim()}${extraInfo}: ${items.join(', ')}`;
-                    }).filter(t => t).join('\n');
+                if (limit) {
+                    categoryTitle = categoryTitle.replace(/\(Grátis,.*? \d+\)/, `(Grátis, escolha até ${limit})`);
                 }
                 
-                message += `\n*${index + 1}. ${item.quantity}x ${item.name} (${item.size || item.product.name})* - ${app.formatCurrency(itemTotal)}\n`;
-                if (toppingsText) message += `${toppingsText}\n`;
-            });
-            
-            // Coupon/Discount (NEW ADDITION)
-            if (app.coupon.applied) {
-                const couponCode = app.coupon.applied.code;
-                message += `\n*--- CUPOM ---*\n`;
-                message += `Cupom Aplicado: *${couponCode}*\n`;
-                
-                if (totalDiscount > 0) {
-                    message += `Desconto no Subtotal: *-${app.formatCurrency(totalDiscount)}*\n`;
-                }
-                if (app.coupon.applied.type === 'free_delivery' && baseDeliveryFee > 0) {
-                    message += `Desconto na Taxa de Entrega: *-${app.formatCurrency(baseDeliveryFee)}* (TAXA-0)\n`;
-                }
-            }
-
-
-            // Summary
-            message += `\n*--- RESUMO ---*\n`;
-            message += `Subtotal: ${app.formatCurrency(subtotal)}\n`;
-            message += `Taxa de Entrega: ${finalDeliveryFee > 0 ? app.formatCurrency(finalDeliveryFee) : 'GRÁTIS'}\n`;
-            message += `*TOTAL DO PEDIDO: ${app.formatCurrency(total)}*\n`;
-
-            // Delivery/Takeout Info
-            message += `\n*--- ENTREGA/RETIRADA ---*\n`;
-            message += `Opção: ${deliveryOption === 'delivery' ? 'Entrega (Delivery)' : 'Retirar na Loja (Takeout)'}\n`;
-            if (deliveryOption === 'delivery') {
-                const neighborhood = app.elements.neighborhoodSelect.selectedOptions[0]?.textContent || '';
-                message += `Bairro: ${neighborhood.split('(')[0].trim()}\n`;
-                message += `Endereço: ${app.elements.customerAddressInput.value.trim()}\n`;
-            }
-
-            // Payment & Observations
-            message += `\n*--- PAGAMENTO E OBSERVAÇÕES ---*\n`;
-            message += `Pagamento: ${paymentMethod}\n`;
-            if (observations) {
-                message += `Obs: ${observations}\n`;
-            } else {
-                 message += `Obs: Nenhuma\n`;
-            }
-
-            return encodeURIComponent(message);
-        },
-        renderOrderSummary() {
-            const { subtotal, finalDeliveryFee, total, totalDiscount, baseDeliveryFee } = app.calculateCartTotal();
-
-            let summaryHtml = '';
-            
-            // Items list
-            summaryHtml += app.cart.map((item, index) => {
-                const itemTotal = app.calculateItemTotal(item);
-                const toppingsList = item.selectedToppings ? Object.keys(item.selectedToppings).map(groupKey => {
-                    const items = item.selectedToppings[groupKey];
-                    if (items.length === 0) return '';
-                    const group = app.toppings[groupKey];
-                    
-                    let extraInfo = '';
-                    const count = items.length;
-                    if (group.price) {
-                        extraInfo = ` (+${app.formatCurrency(group.price * count)})`;
-                    } else if (group.limit && count > group.limit) {
-                        const pricePerExtra = app.toppings.paid_tier2.price || 0;
-                        const extraCount = count - group.limit;
-                        extraInfo = ` (+${app.formatCurrency(extraCount * pricePerExtra)})`;
-                    }
-
-                    return `<span class="text-xs text-gray-500 block">${group.title.split('(')[0].trim()}: ${items.join(', ')}<span class="text-yellow-500">${extraInfo}</span></span>`;
-                }).join('') : '';
-
-                return `
-                    <div class="py-2 border-b border-gray-700 last:border-b-0">
-                        <div class="flex justify-between">
-                            <span class="font-semibold text-white">${item.quantity}x ${item.name} (${item.size || item.product.name})</span>
-                            <span class="font-bold text-pink-400">${app.formatCurrency(itemTotal)}</span>
-                        </div>
-                        ${toppingsList}
-                    </div>
-                `;
-            }).join('');
-            
-            // Totals
-            summaryHtml += `<div class="mt-4 pt-2 border-t border-gray-700 space-y-1">`;
-            summaryHtml += `<div class="flex justify-between text-gray-400"><span>Subtotal:</span><span>${app.formatCurrency(subtotal)}</span></div>`;
-            
-            // Discount display (NEW ADDITION)
-            if (totalDiscount > 0) {
-                 summaryHtml += `<div class="flex justify-between text-pink-400 font-semibold"><span>Desconto (${app.coupon.applied.code}):</span><span>- ${app.formatCurrency(totalDiscount)}</span></div>`;
-            }
-
-            let feeText = finalDeliveryFee > 0 ? app.formatCurrency(finalDeliveryFee) : (baseDeliveryFee > 0 ? `<span class="text-green-400">GRÁTIS (${app.coupon.applied.code})</span>` : 'R$ 0,00');
-            summaryHtml += `<div class="flex justify-between text-gray-400"><span>Entrega:</span><span>${feeText}</span></div>`;
-
-            summaryHtml += `<div class="flex justify-between text-xl font-bold mt-2 pt-2 border-t border-gray-700 text-white"><span>TOTAL:</span><span class="instagram-gradient-text">${app.formatCurrency(total)}</span></div>`;
-            summaryHtml += `</div>`;
-            
-            // Customer Info
-            const deliveryOption = app.getDeliveryOption();
-            const neighborhoodText = deliveryOption === 'delivery' ? (app.elements.neighborhoodSelect.selectedOptions[0]?.textContent || 'Bairro não selecionado') : '';
-            const addressText = deliveryOption === 'delivery' ? app.elements.customerAddressInput.value.trim() : 'Retirada na Loja';
-
-            summaryHtml += `<div class="mt-4 pt-4 border-t border-gray-700 text-sm space-y-1">
-                <p><span class="font-semibold text-white">Nome:</span> ${app.elements.customerNameInput.value.trim()}</p>
-                <p><span class="font-semibold text-white">Opção:</span> ${deliveryOption === 'delivery' ? 'Delivery' : 'Retirar na Loja'}</p>
-                ${deliveryOption === 'delivery' ? `<p><span class="font-semibold text-white">Bairro:</span> ${neighborhoodText.split('(')[0].trim()}</p>` : ''}
-                <p><span class="font-semibold text-white">Endereço:</span> ${addressText}</p>
-                <p><span class="font-semibold text-white">Pagamento:</span> ${app.elements.paymentMethod.value}</p>
-                <p><span class="font-semibold text-white">Obs:</span> ${app.elements.observations.value.trim() || 'Nenhuma'}</p>
-            </div>`;
-
-            app.elements.orderSummary.innerHTML = summaryHtml;
-        },
-        getDeliveryOption() {
-            return document.querySelector('input[name="delivery_option"]:checked').value;
-        },
-        toggleDeliveryFields() {
-            const isDelivery = app.getDeliveryOption() === 'delivery';
-            if (isDelivery) {
-                app.elements.deliveryFields.classList.remove('hidden');
-                app.elements.deliveryOptionDelivery.querySelector('div').classList.remove('border-gray-600');
-                app.elements.deliveryOptionDelivery.querySelector('div').classList.add('border-pink-500');
-                app.elements.deliveryOptionTakeout.querySelector('div').classList.remove('border-pink-500');
-                app.elements.deliveryOptionTakeout.querySelector('div').classList.add('border-gray-600');
-            } else {
-                app.elements.deliveryFields.classList.add('hidden');
-                app.elements.deliveryOptionDelivery.querySelector('div').classList.remove('border-pink-500');
-                app.elements.deliveryOptionDelivery.querySelector('div').classList.add('border-gray-600');
-                app.elements.deliveryOptionTakeout.querySelector('div').classList.remove('border-gray-600');
-                app.elements.deliveryOptionTakeout.querySelector('div').classList.add('border-pink-500');
-            }
-            app.renderCart(); 
-        },
-        openItemModal(productId, size = null, cartIndex = null) {
-            const product = app.products.find(p => p.id === productId);
-            if (!product) return;
-
-            if (product.type === 'combo_selectable_size' && !size) {
-                app.selectedComboProductId = productId;
-                app.openComboSizeModal(product);
-                return;
-            }
-
-            // If editing, use existing item data
-            if (cartIndex !== null) {
-                app.currentItem = { ...app.cart[cartIndex], cartIndex };
-            } else {
-                // New item
-                const basePrice = product.price || app.cupSizes.find(s => s.name === size).price;
-                app.currentItem = {
-                    product,
-                    basePrice,
-                    size,
-                    name: product.name,
-                    quantity: 1,
-                    selectedToppings: app.deepClone(app.defaultToppingsForProduct(product)),
-                    cartIndex: null
-                };
-            }
-            
-            app.renderItemModal();
-            app.elements.itemModal.classList.add('flex');
-            app.elements.itemModal.classList.remove('hidden');
-        },
-        closeItemModal() {
-            app.elements.itemModal.classList.remove('flex');
-            app.elements.itemModal.classList.add('hidden');
-            app.currentItem = null;
-        },
-        openComboSizeModal(product) {
-            app.elements.comboSizeModalTitle.textContent = `Escolha o Tamanho para ${product.name}`;
-            let html = '';
-            app.cupSizes.forEach(size => {
-                html += `
-                    <label>
-                        <input type="radio" name="combo_size" value="${size.name}" data-price="${size.price}" class="hidden">
-                        <div class="flex justify-between items-center p-4 border-2 border-gray-600 rounded-xl cursor-pointer transition-all hover:border-pink-500">
-                            <span class="text-lg font-semibold text-white">${size.name}</span>
-                            <span class="text-xl font-bold text-pink-500">${app.formatCurrency(size.price)}</span>
-                        </div>
+                const itemsHTML = category.items.filter(item => !item.disabled).map(item => `
+                    <label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-700 cursor-pointer">
+                        <input type="checkbox" class="h-5 w-5 rounded border-gray-500 bg-gray-600 text-pink-600 focus:ring-pink-500" name="${key}" value="${item.name}" data-price="${category.price || 0}">
+                        <span class="text-gray-300">${item.name}</span>
                     </label>
-                `;
+                `).join('');
+
+                if (itemsHTML) {
+                    app.elements.modalBody.innerHTML += `<div class="mt-4"><h4 class="text-lg font-bold text-gray-100 mb-2 pb-1 border-b border-gray-700">${categoryTitle}</h4><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${itemsHTML}</div></div>`;
+                }
             });
-            app.elements.comboSizeModalBody.innerHTML = html;
-            
-            const radioButtons = app.elements.comboSizeModalBody.querySelectorAll('input[name="combo_size"]');
-            radioButtons.forEach(radio => {
-                radio.addEventListener('change', () => {
-                    app.elements.selectComboSizeBtn.disabled = !document.querySelector('input[name="combo_size"]:checked');
+            app.elements.modalBody.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', app.updateModalItemTotal));
+            app.updateModalItemTotal();
+            app.openModal(app.elements.itemModal);
+        },
+        closeItemModal() { app.closeModal(app.elements.itemModal); app.currentItem = null; },
+        
+        updateComboModalQuantity(change) {
+            const quantityEl = document.getElementById('combo-modal-quantity');
+            if (!quantityEl) return;
+            let currentQuantity = parseInt(quantityEl.textContent);
+            if (currentQuantity + change >= 1) {
+                quantityEl.textContent = currentQuantity + change;
+            }
+        },
+        
+        updateModalQuantity(change) {
+            const quantityEl = document.getElementById('modal-quantity');
+            if (!quantityEl || !app.currentItem) return;
+
+            let currentQuantity = app.currentItem.quantity || 1;
+            if (currentQuantity + change >= 1) {
+                currentQuantity += change;
+                app.currentItem.quantity = currentQuantity;
+                quantityEl.textContent = currentQuantity;
+                app.updateModalItemTotal();
+            }
+        },
+
+        updateModalItemTotal() {
+            let toppingsTotal = 0;
+            const toppingsList = [];
+            Object.entries(app.toppings).forEach(([key, category]) => {
+                const checked = app.elements.modalBody.querySelectorAll(`input[name="${key}"]:checked`);
+                const all = app.elements.modalBody.querySelectorAll(`input[name="${key}"]`);
+                const limit = app.currentItem.customToppingLimits?.[key] || category.limit;
+
+                if (limit) {
+                    const limitReached = checked.length >= limit;
+                    all.forEach(cb => { if (!cb.checked) cb.disabled = limitReached; });
+                }
+                checked.forEach(cb => {
+                    const price = parseFloat(cb.dataset.price);
+                    if (price > 0) toppingsTotal += price;
+                    toppingsList.push({ name: cb.value, price: price });
                 });
             });
-
-            app.elements.selectComboSizeBtn.onclick = () => {
-                const selectedSize = document.querySelector('input[name="combo_size"]:checked');
-                if (selectedSize) {
-                    app.closeComboSizeModal();
-                    app.openItemModal(app.selectedComboProductId, selectedSize.value);
-                }
-            };
-            app.elements.selectComboSizeBtn.disabled = true; // Start disabled
-
-            app.elements.comboSizeModal.classList.add('flex');
-            app.elements.comboSizeModal.classList.remove('hidden');
-        },
-        closeComboSizeModal() {
-            app.elements.comboSizeModal.classList.remove('flex');
-            app.elements.comboSizeModal.classList.add('hidden');
-            app.selectedComboProductId = null;
-        },
-        updateItemQuantity(change) {
-            app.currentItem.quantity += change;
-            if (app.currentItem.quantity < 1) app.currentItem.quantity = 1;
-            app.renderItemModal();
-        },
-        toggleTopping(event, groupKey) {
-            const itemName = event.target.getAttribute('data-item');
-            const isChecked = event.target.checked;
+            // The item price is always the unit price
+            app.currentItem.price = app.currentItem.basePrice + toppingsTotal;
+            app.currentItem.toppings = toppingsList.sort((a, b) => a.name.localeCompare(b.name));
             
-            let selectedItems = app.currentItem.selectedToppings[groupKey] || [];
+            // Calculate final price for display
+            const finalPrice = app.currentItem.price * app.currentItem.quantity;
+            app.elements.modalItemTotal.textContent = app.formatCurrency(finalPrice);
 
-            if (isChecked) {
-                // If it's a paid group, just add it.
-                // If it's a free group with limit 1 (caldas), uncheck others before adding.
-                if (groupKey === 'caldas' && app.toppings.caldas.limit === 1) {
-                    selectedItems.forEach(item => {
-                        const existingCheckbox = document.querySelector(`input[data-group="${groupKey}"][data-item="${item}"]`);
-                        if (existingCheckbox && existingCheckbox.checked) {
-                            existingCheckbox.checked = false;
-                        }
-                    });
-                    selectedItems = [];
-                    selectedItems.push(itemName);
-                } else {
-                    selectedItems.push(itemName);
-                }
+            // Update button text
+            const btn = app.elements.addToCartBtn;
+            if (app.currentItem.quantity > 1) {
+                btn.innerHTML = `Adicionar ${app.currentItem.quantity} Itens`;
             } else {
-                const index = selectedItems.indexOf(itemName);
-                if (index > -1) {
-                    selectedItems.splice(index, 1);
-                }
+                btn.innerHTML = `Adicionar ao Carrinho`;
             }
-            app.currentItem.selectedToppings[groupKey] = selectedItems;
-            app.renderItemModal();
         },
-        defaultToppingsForProduct(product) {
-             const defaultToppings = {};
-             // For customizable products, start with empty selection
-             if (product.type === 'base_acai' || product.type === 'combo' || product.type === 'combo_selectable_size') {
-                 Object.keys(app.toppings).forEach(key => {
-                     defaultToppings[key] = [];
-                 });
-                 return defaultToppings;
-             }
-             return {};
+
+        // --- CART LOGIC (renderCart updated) ---
+        toggleCartModal() {
+            app.renderDeliveryOptions();
+            app.elements.couponInput.value = app.activeCoupon || ''; // Restore coupon input from state
+            app.renderCart();
+            if (app.elements.cartModal.classList.contains('hidden')) app.openModal(app.elements.cartModal);
+            else app.closeModal(app.elements.cartModal);
         },
         addToCart() {
-            // CORREÇÃO: CRIAÇÃO DE CÓPIA PROFUNDA (DEEP CLONE)
+            const toppingsStr = app.currentItem.toppings.map(t => `${t.name}-${t.price}`).sort().join(',');
+            const existingItemIndex = app.cart.findIndex(item =>
+                item.id === app.currentItem.id && item.selectedSize === app.currentItem.selectedSize &&
+                item.toppings.map(t => `${t.name}-${t.price}`).sort().join(',') === toppingsStr
+            );
             
-            // Remove helper properties before saving to cart (cartIndex is not needed in the cart array)
-            const itemToAdd = app.deepClone(app.currentItem);
-            delete itemToAdd.cartIndex;
-            
-            if (app.currentItem.cartIndex !== null) {
-                // Update existing item
-                app.cart[app.currentItem.cartIndex] = itemToAdd;
+            const quantityToAdd = app.currentItem.quantity || 1;
+
+            if (existingItemIndex > -1) {
+                app.cart[existingItemIndex].quantity += quantityToAdd;
             } else {
-                // Add new item (using the deep clone)
-                app.cart.push(itemToAdd);
+                // currentItem already has the correct quantity set from the modal
+                app.cart.push({ ...app.currentItem });
             }
-            
             app.saveCart();
-            app.updateCartCount();
-            app.currentItem = null;
+            app.renderCart();
+            app.updateCartIcon();
         },
-        editCartItem(index) {
-            app.toggleCartModal();
-            const item = app.cart[index];
-            app.openItemModal(item.product.id, item.size, index);
+        updateQuantity(index, change) {
+            if (app.cart[index].quantity + change > 0) app.cart[index].quantity += change;
+            else app.removeFromCart(index);
+            app.saveCart();
+            app.renderCart();
+            app.updateCartIcon();
         },
-        removeCartItem(index) {
+        removeFromCart(index) {
             app.cart.splice(index, 1);
             app.saveCart();
             app.renderCart();
+            app.updateCartIcon();
+        },
+        updateCartIcon() {
+            const totalItems = app.cart.reduce((sum, item) => sum + item.quantity, 0);
+            app.elements.cartCountEl.textContent = totalItems;
+            app.elements.cartButton.classList.toggle('hidden', totalItems === 0);
+            if (totalItems === 0 && !app.elements.cartModal.classList.contains('hidden')) {
+                app.toggleCartModal();
+            }
+        },
+
+        // --- ORDER FINALIZATION (Updated to include coupon in summary) ---
+        finalizeOrder() {
+            if (!app.isStoreOpen || app.cart.length === 0) return;
+            app.saveCustomerInfo();
+            const name = app.elements.customerNameInput.value.trim();
+            const address = app.elements.customerAddressInput.value.trim();
+            const neighborhood = app.elements.neighborhoodSelect.value;
+            const payment = app.elements.paymentMethod.value;
+            const obs = app.elements.observations.value.trim();
+            const deliveryOption = document.querySelector('input[name="delivery_option"]:checked')?.value;
+            
+            if (!name) return app.showAlert('Por favor, preencha seu Nome.', 'Dados Incompletos', true);
+            if (deliveryOption === 'delivery' && (!address || !neighborhood)) {
+                return app.showAlert('Selecione o Bairro e preencha o Endereço.', 'Dados Incompletos', true);
+            }
+
+            // Recalculate totals one last time
+            app.renderCart(); 
+
+            let deliveryFee = parseFloat(app.elements.cartDeliveryFee.textContent.replace('R$ ', '').replace(',', '.') || 0);
+            const subtotal = app.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const finalTotal = subtotal - app.couponDiscount + deliveryFee;
+            
+            let summary = `*NOVO PEDIDO - SABOR AÇAÍTERIA*\n\n*Cliente:* ${name}\n`;
+            if (deliveryOption === 'delivery') {
+                summary += `*Opção:* ENTREGA\n*Endereço:* ${address}, ${neighborhood}\n\n`;
+            } else {
+                summary += `*Opção:* RETIRAR NA LOJA\n\n`;
+            }
+
+            // Add coupon information to the order summary
+            if (app.activeCoupon) {
+                const coupon = app.couponRules[app.activeCoupon];
+                summary += `*CUPOM APLICADO:* ${app.activeCoupon} (${coupon.description.replace(/(\(|\))/g, '')})\n\n`;
+            }
+
+            summary += `*ITENS DO PEDIDO:*\n------------------------\n`;
+            app.cart.forEach(item => {
+                summary += `*${item.quantity}x ${item.name}*`;
+                if (item.selectedSize) summary += ` (${item.selectedSize})`;
+                if (item.type === 'combo_selectable_size' && item.description) summary += ` - ${item.description.replace('Sugestão: ', '')}`;
+                summary += `\n`;
+                if (item.toppings.length > 0) item.toppings.forEach(t => { summary += `  - ${t.name}\n`; });
+                summary += `Subtotal: ${app.formatCurrency(item.price * item.quantity)}\n------------------------\n`;
+            });
+
+            summary += `\n*Subtotal dos Itens: ${app.formatCurrency(subtotal)}*\n`;
+            
+            if (app.couponDiscount > 0) {
+                 summary += `*Desconto do Cupom: - ${app.formatCurrency(app.couponDiscount)}*\n`;
+            }
+
+            summary += `*Taxa de Entrega: ${app.formatCurrency(deliveryFee)}*\n`;
+            summary += `*TOTAL: ${app.formatCurrency(finalTotal)}*\n*Pagamento:* ${payment}\n`;
+            if (obs) summary += `*Observações:* ${obs}\n`;
+            
+            app.whatsAppMessage = encodeURIComponent(summary);
+            app.elements.orderSummary.innerHTML = summary.replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+            app.closeModal(app.elements.cartModal);
+            app.openModal(app.elements.confirmationModal);
         },
         sendOrderViaWhatsApp() {
             window.open(`https://wa.me/${app.adminSettings.whatsappNumber}?text=${app.whatsAppMessage}`, '_blank');
-            
+            app.elements.confirmationIcon.innerHTML = '<i class="fab fa-whatsapp-square text-green-400 text-6xl mb-4"></i>';
+            app.elements.confirmationTitle.textContent = 'Quase lá!';
+            app.elements.confirmationMessage.textContent = 'A janela do WhatsApp foi aberta. Após enviar sua mensagem, clique abaixo para confirmar e limpar seu carrinho.';
             app.elements.initialConfirmButtons.classList.add('hidden');
             app.elements.postSendButtons.classList.remove('hidden');
-            
-            app.elements.confirmationIcon.innerHTML = `<i class="fas fa-paper-plane text-blue-500 text-6xl mb-4"></i>`;
-            app.elements.confirmationTitle.textContent = 'Mensagem Enviada!';
-            app.elements.confirmationMessage.textContent = 'Agora confirme o envio para limpar seu carrinho e pronto!';
+            app.elements.postSendButtons.classList.add('flex');
         },
         confirmOrderSent() {
             app.cart = [];
+            app.clearCoupon(); // Clear coupon on order completion
             app.saveCart();
-            app.updateCartCount();
             app.closeConfirmationModal();
-            app.showAlert('O carrinho foi limpo com sucesso!', 'Pronto!', 'fas fa-check-circle text-green-500 text-5xl');
-        },
-        openConfirmationModal() {
-            app.elements.confirmationModal.classList.add('flex');
-            app.elements.confirmationModal.classList.remove('hidden');
-            app.elements.initialConfirmButtons.classList.remove('hidden');
-            app.elements.postSendButtons.classList.add('hidden');
-            app.elements.confirmationIcon.innerHTML = `<i class="fas fa-check-circle text-green-500 text-6xl mb-4"></i>`;
-            app.elements.confirmationTitle.textContent = 'Pedido Recebido!';
-            app.elements.confirmationMessage.textContent = 'Seu pedido foi gerado! Clique no botão abaixo para encaminhá-lo para o WhatsApp da loja e finalizar a compra.';
+            app.renderCart();
+            app.updateCartIcon();
+            app.showAlert('Seu carrinho foi limpo. Aguarde a confirmação da loja!', 'Pedido Enviado');
         },
         closeConfirmationModal() {
-            app.elements.confirmationModal.classList.remove('flex');
-            app.elements.confirmationModal.classList.add('hidden');
+            app.closeModal(app.elements.confirmationModal);
+            setTimeout(() => {
+                app.elements.confirmationIcon.innerHTML = '<i class="fas fa-check-circle text-green-500 text-6xl mb-4"></i>';
+                app.elements.confirmationTitle.textContent = 'Pedido Recebido!';
+                app.elements.confirmationMessage.textContent = 'Seu pedido foi gerado! Clique no botão abaixo para encaminhá-lo para o WhatsApp da loja e finalizar a compra.';
+                app.elements.initialConfirmButtons.classList.remove('hidden');
+                app.elements.postSendButtons.classList.add('hidden');
+            }, 300);
         },
-        showAlert(message, title = 'Atenção', iconHtml = '<i class="fas fa-exclamation-triangle text-yellow-500 text-5xl"></i>') {
-            app.elements.alertMessage.textContent = message;
-            app.elements.alertTitle.textContent = title;
-            app.elements.alertIcon.innerHTML = iconHtml;
-            app.elements.alertModal.classList.add('flex');
-            app.elements.alertModal.classList.remove('hidden');
-        },
-        closeAlertModal() {
-            app.elements.alertModal.classList.remove('flex');
-            app.elements.alertModal.classList.add('hidden');
-        },
-        openAdminPanel(event) {
-            event.preventDefault();
-            app.elements.adminPasswordInput.value = '';
-            app.elements.passwordModal.classList.add('flex');
-            app.elements.passwordModal.classList.remove('hidden');
-        },
-        closeAdminModal() {
-            app.elements.adminModal.classList.remove('flex');
-            app.elements.adminModal.classList.add('hidden');
-        },
-        closePasswordModal() {
-            app.elements.passwordModal.classList.remove('flex');
-            app.elements.passwordModal.classList.add('hidden');
-        },
+
+        // --- ADMIN PANEL (Functionality unchanged, UI kept separate) ---
+        openAdminPanel(e) { e.preventDefault(); app.openModal(app.elements.passwordModal); app.elements.adminPasswordInput.focus(); },
+        closePasswordModal() { app.closeModal(app.elements.passwordModal); app.elements.adminPasswordInput.value = ''; },
         checkAdminPassword() {
-            const password = app.elements.adminPasswordInput.value;
-            // Simplified for this context: default password
-            if (password === 'admin123') {
+            if (app.elements.adminPasswordInput.value === "admin123") {
                 app.closePasswordModal();
                 app.renderAdminPanel();
-                app.elements.adminModal.classList.add('flex');
-                app.elements.adminModal.classList.remove('hidden');
+                app.openModal(app.elements.adminModal);
             } else {
-                app.showAlert('Senha incorreta.', 'Erro de Acesso', '<i class="fas fa-lock text-red-500 text-5xl"></i>');
-                app.elements.adminPasswordInput.value = '';
+                app.closePasswordModal();
+                app.showAlert("Senha incorreta!", 'Acesso Negado', true);
             }
         },
-        deepClone(obj) {
-            // CORREÇÃO: Função para criar uma cópia profunda, essencial para o carrinho.
-            return JSON.parse(JSON.stringify(obj));
+        closeAdminModal() { app.closeModal(app.elements.adminModal); },
+        renderAdminPanel() { app.elements.adminBody.innerHTML = `<p class="text-center">A interface do painel de administração foi mantida funcional e não segue o tema escuro.</p><p class="text-center mt-4">Clique em "Salvar" para aplicar as configurações atuais ou "Restaurar" para limpar os dados.</p>`; },
+        saveAdminChanges() { app.showAlert('As configurações foram salvas.', 'Salvo'); app.closeAdminModal(); },
+        resetToDefaults() {
+            localStorage.clear();
+            app.showAlert('Configurações restauradas! A página será recarregada.', 'Sucesso');
+            setTimeout(() => window.location.reload(), 2000);
         },
-        updateStoreStatus() {
-            const now = new Date();
-            const currentDay = now.getDay();
-            const dayOfWeek = currentDay;
-            const openDays = app.adminSettings.openDays;
 
-            const [openHour, openMinute] = app.adminSettings.openingTime.split(':').map(Number);
-            const [closeHour, closeMinute] = app.adminSettings.closingTime.split(':').map(Number);
+        // --- FAKE ONLINE COUNTER (UNCHANGED) ---
+        updateOnlineCounter() {
+            const min = 4;
+            const max = 20;
+            const currentCount = parseInt(app.elements.onlineCount.textContent, 10);
+            let newCount;
+            
+            const change = Math.random() > 0.5 ? 1 : -1;
+            newCount = currentCount + change;
 
-            const openingTime = new Date();
-            openingTime.setHours(openHour, openMinute, 0, 0);
-            const closingTime = new Date();
-            closingTime.setHours(closeHour, closeMinute, 0, 0);
-
-            app.isStoreOpen = false;
-            let statusText = 'Fechado';
-            let statusClass = 'bg-red-500';
-
-            // 1. Check Manual/Forced Status
-            if (app.adminSettings.storeStatus === 'open') {
-                app.isStoreOpen = true;
-                statusText = 'Aberto (Forçado)';
-                statusClass = 'bg-green-500';
-            } else if (app.adminSettings.storeStatus === 'closed') {
-                app.isStoreOpen = false;
-                statusText = 'Fechado (Forçado)';
-                statusClass = 'bg-red-500';
-            } 
-            // 2. Check Auto Status
-            else if (openDays.includes(dayOfWeek)) {
-                if (now >= openingTime && now < closingTime) {
-                    app.isStoreOpen = true;
-                    statusText = 'Aberto Agora';
-                    statusClass = 'bg-green-500';
-                } else if (now < openingTime) {
-                    statusText = 'Fechado. Abre em breve.';
-                    statusClass = 'bg-yellow-500';
-                } else {
-                    statusText = 'Fechado. Reabre amanhã ou no próximo dia aberto.';
-                    statusClass = 'bg-red-500';
-                }
-            } else {
-                statusText = 'Fechado. Reabre no próximo dia aberto.';
-                statusClass = 'bg-red-500';
-            }
-
-            // Update UI elements
-            app.elements.storeHoursDisplay.textContent = `Hoje: ${app.adminSettings.openingTime} às ${app.adminSettings.closingTime}`;
-            app.elements.storeStatusIndicator.textContent = statusText.split(' ')[0];
-            app.elements.storeStatusIndicator.className = `ml-2 px-2 py-0.5 text-xs rounded-full font-semibold text-white ${statusClass}`;
-
-            // Show or hide main store status banner
-            if (app.isStoreOpen) {
-                app.elements.storeStatusBanner.classList.add('hidden');
-                app.elements.closingTimerContainer.classList.remove('hidden');
-                app.elements.openingTimerContainer.classList.add('hidden');
-            } else {
-                app.elements.storeStatusBanner.classList.remove('hidden');
-                app.elements.closingTimerContainer.classList.add('hidden');
-                
-                // If not forced closed, calculate next opening time
-                if (app.adminSettings.storeStatus !== 'closed') {
-                    app.elements.openingTimerContainer.classList.remove('hidden');
-                } else {
-                    app.elements.openingTimerContainer.classList.add('hidden');
-                }
-
-                app.elements.storeStatusBanner.innerHTML = `
-                    <div class="bg-red-800 bg-opacity-70 p-4 rounded-lg flex items-center gap-3">
-                        <i class="fas fa-times-circle text-2xl text-red-400"></i>
-                        <div>
-                            <p class="font-bold text-white">${statusText}</p>
-                            <p class="text-sm text-gray-300">Aceitamos pedidos apenas durante o horário de funcionamento.</p>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Delivery Countdown logic (assuming delivery starts at store open, or a specific time)
-            const [deliveryStartHour, deliveryStartMinute] = app.isWeekend(dayOfWeek) 
-                ? app.adminSettings.weekendDeliveryStartTime.split(':').map(Number)
-                : app.adminSettings.weekdayDeliveryStartTime.split(':').map(Number);
-
-            const deliveryStartTime = new Date();
-            deliveryStartTime.setHours(deliveryStartHour, deliveryStartMinute, 0, 0);
-
-            if (app.isStoreOpen && now < deliveryStartTime && app.getDeliveryOption() === 'delivery') {
-                app.elements.deliveryCountdownContainer.classList.remove('hidden');
-                app.isDeliveryTime = false;
-            } else if (app.isStoreOpen) {
-                app.elements.deliveryCountdownContainer.classList.add('hidden');
-                app.isDeliveryTime = true;
-            } else {
-                 app.elements.deliveryCountdownContainer.classList.add('hidden');
-                 app.isDeliveryTime = false;
-            }
+            if (newCount > max) newCount = max - 1;
+            if (newCount < min) newCount = min + 1;
+            
+            app.elements.onlineCount.textContent = newCount;
+            
+            const randomInterval = Math.floor(Math.random() * (8000 - 3000 + 1)) + 3000;
+            setTimeout(app.updateOnlineCounter, randomInterval);
         },
-        isWeekend(day) {
-            return day === 0 || day === 6; // Sunday or Saturday
-        },
-        updateTimers() {
-            const now = new Date();
-            const [closeHour, closeMinute] = app.adminSettings.closingTime.split(':').map(Number);
-            const [deliveryStartHour, deliveryStartMinute] = app.isWeekend(now.getDay()) 
-                ? app.adminSettings.weekendDeliveryStartTime.split(':').map(Number)
-                : app.adminSettings.weekdayDeliveryStartTime.split(':').map(Number);
 
-            // 1. Closing Timer
-            if (app.isStoreOpen) {
-                const closingTime = new Date();
-                closingTime.setHours(closeHour, closeMinute, 0, 0);
-                
-                let diff = closingTime.getTime() - now.getTime();
-                if (diff < 0) {
-                    // Time to close or already closed (if status is 'auto')
-                    diff += 24 * 60 * 60 * 1000; // Add 24h to show time until next day closing if logic allows
-                }
-
-                const hours = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, '0');
-                const minutes = String(Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-                const seconds = String(Math.floor((diff % (1000 * 60)) / 1000)).padStart(2, '0');
-                app.elements.closingTimer.textContent = `${hours}:${minutes}:${seconds}`;
-
-                if (diff < 5 * 60 * 1000 && diff > 0) { // Less than 5 minutes
-                     app.elements.closingTimerContainer.classList.add('bg-red-900', 'border-red-500');
-                     app.elements.closingTimerContainer.classList.remove('bg-gray-900', 'border-gray-700');
-                } else {
-                    app.elements.closingTimerContainer.classList.remove('bg-red-900', 'border-red-500');
-                    app.elements.closingTimerContainer.classList.add('bg-gray-900', 'border-gray-700');
-                }
-            }
-
-            // 2. Opening Timer
-            if (!app.isStoreOpen && app.adminSettings.storeStatus !== 'closed') {
-                const nextOpen = app.getNextOpeningDate();
-                if (nextOpen) {
-                    let diff = nextOpen.getTime() - now.getTime();
-                    if (diff < 0) diff = 0;
-
-                    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                    const hours = String(Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
-                    const minutes = String(Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-                    const seconds = String(Math.floor((diff % (1000 * 60)) / 1000)).padStart(2, '0');
-                    
-                    if (days > 0) {
-                        app.elements.openingTimer.textContent = `${days}d ${hours}h`;
-                    } else {
-                        app.elements.openingTimer.textContent = `${hours}:${minutes}:${seconds}`;
-                    }
-                }
-            }
-
-            // 3. Delivery Countdown Timer
-             if (!app.isDeliveryTime && app.isStoreOpen) {
-                const deliveryStartTime = new Date();
-                deliveryStartTime.setHours(deliveryStartHour, deliveryStartMinute, 0, 0);
-
-                let diff = deliveryStartTime.getTime() - now.getTime();
-                 if (diff <= 0) {
-                     app.updateStoreStatus(); // Trigger status update to hide timer
-                     return;
-                 }
-
-                const minutes = String(Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-                const seconds = String(Math.floor((diff % (1000 * 60)) / 1000)).padStart(2, '0');
-                app.elements.deliveryCountdownTimer.textContent = `${minutes}:${seconds}`;
-            }
-
-            // Update status every 5 seconds (important for open/close detection)
-            if (now.getSeconds() % 5 === 0) {
-                 app.updateStoreStatus();
-            }
-        },
+        // --- INITIALIZATION ---
         initializeApp() {
-            app.loadAdminSettings();
-            app.loadProductsAndToppings();
+            app.loadLocalData();
             app.loadCart();
             app.loadCustomerInfo();
-            app.loadUsedCoupons(); // <-- NOVO: Carregar cupons usados
+            app.loadCoupon(); // NEW: Load active coupon state
             
-            app.renderProducts();
-            app.updateStoreStatus();
-            app.renderCart(); // Call once on init to show button if cart has items
-            app.setupEventListeners();
+            const whatsappUrl = `https://wa.me/${app.adminSettings.whatsappNumber}`;
+            app.elements.storeAddressDisplay.textContent = app.adminSettings.address;
+            app.elements.whatsappLink.href = whatsappUrl;
+            app.elements.messageButtonLink.href = whatsappUrl;
 
-            // Setup timers
-            app.updateTimers();
-            app.countdownInterval = setInterval(app.updateTimers, 1000);
-        },
-        setupEventListeners() {
+
+            app.checkStoreStatus();
+            setInterval(app.checkStoreStatus, 60 * 1000);
+
+            // Initialize and start the online counter
+            app.elements.onlineCount.textContent = Math.floor(Math.random() * (20 - 4 + 1)) + 4;
+            app.updateOnlineCounter();
+
+            // Event listeners
             app.elements.addToCartBtn.addEventListener('click', () => { app.addToCart(); app.closeItemModal(); });
             app.elements.customerNameInput.addEventListener('input', app.saveCustomerInfo);
             app.elements.customerAddressInput.addEventListener('input', app.saveCustomerInfo);
             app.elements.neighborhoodSelect.addEventListener('change', () => { app.saveCustomerInfo(); app.renderCart(); });
-            // CORREÇÃO: Chamada para app.removeCoupon() ao mudar a opção de entrega
-            app.elements.deliveryOptionRadios.forEach(radio => radio.addEventListener('change', () => { app.toggleDeliveryFields(); app.saveCustomerInfo(); app.removeCoupon(); app.renderCart(); })); 
-            app.elements.paymentMethod.addEventListener('change', app.saveCustomerInfo);
-            app.elements.observations.addEventListener('input', app.saveCustomerInfo);
+            app.elements.deliveryOptionRadios.forEach(radio => radio.addEventListener('change', () => { 
+                app.toggleDeliveryFields(); 
+                app.saveCustomerInfo(); 
+                app.renderCart(); // Re-render to check coupon eligibility
+            }));
             app.elements.adminPasswordInput.addEventListener('keypress', e => { if (e.key === 'Enter') app.checkAdminPassword(); });
-            
-            // NOVOS EVENT LISTENERS DO CUPOM
-            app.elements.applyCouponBtn.addEventListener('click', app.applyCoupon);
-            app.elements.couponCodeInput.addEventListener('keypress', e => {
-                if (e.key === 'Enter') {
-                    e.preventDefault(); // Prevent form submission
-                    app.applyCoupon(); 
-                }
-            });
-            // O removeCoupon() está ligado ao botão dentro do HTML de applied-coupon-display
+            app.elements.couponInput.addEventListener('keypress', e => { if (e.key === 'Enter') app.applyCoupon(); }); // NEW: Enter key for coupon
         }
     };
     
-    // Simplified Admin Panel Render/Save for this context
-    app.renderAdminPanel = () => { app.elements.adminBody.innerHTML = `<p class="text-center">A interface do painel de administração foi mantida funcional e não segue o tema escuro.</p><p class="text-center mt-4">Clique em "Salvar" para aplicar as configurações atuais ou "Restaurar" para limpar os dados.</p>`; }
-    app.saveAdminChanges = () => { app.showAlert('As configurações foram salvas.', 'Salvo'); app.closeAdminModal(); }
-    app.resetToDefaults = () => {
-        localStorage.clear();
-        app.showAlert('Configurações restauradas! A página será recarregada.', 'Sucesso');
-        setTimeout(() => window.location.reload(), 2000);
-    }
-
     document.addEventListener('DOMContentLoaded', app.initializeApp);
     </script>
 </body>

@@ -463,19 +463,41 @@
         defaultAdminSettings: {
             storeStatus: 'auto', // 'auto', 'open', 'closed'
             deliveryMode: 'both', // 'both', 'delivery', 'takeout'
-            openingTime: '15:20',
-            closingTime: '22:30',
-            openDays: [0, 1, 2, 3, 4, 5, 6],
             whatsappNumber: '5594991623576',
             address: 'Av. rio Branco. novo Horizonte.. antigo Obba açaí',
-            weekdayDeliveryStartTime: '19:15',
+            
+            // --- HORÁRIO ATUALIZADO ---
+            // Os horários de abertura e fechamento são dinâmicos dependendo do dia
+            // Os dias abertos são todos, mas com horários diferentes
+            openDays: [0, 1, 2, 3, 4, 5, 6], 
+            
+            // Será usado para o banner de abertura/fechamento
+            // Estes horários serão ignorados para o cálculo do status, mas precisam ser definidos
+            // Vamos usar o horário do dia de semana como fallback para exibição no banner
+            openingTime: '19:15', // Usado para banner, mas ignorado no cálculo do status
+            closingTime: '22:00', // Usado para banner, mas ignorado no cálculo do status
+            
+            // Horários de Abertura/Fechamento por dia da semana (Domingo=0 a Sábado=6)
+            dailyHours: [
+                { open: '15:30', close: '21:45' }, // Domingo (0)
+                { open: '19:15', close: '22:00' }, // Segunda (1)
+                { open: '19:15', close: '22:00' }, // Terça (2)
+                { open: '19:15', close: '22:00' }, // Quarta (3)
+                { open: '19:15', close: '22:00' }, // Quinta (4)
+                { open: '19:15', close: '22:00' }, // Sexta (5)
+                { open: '15:30', close: '21:45' }  // Sábado (6)
+            ],
+            
+            // Delivery começa assim que a loja abre
+            weekdayDeliveryStartTime: '19:15', 
             weekendDeliveryStartTime: '15:30'
+            // --- FIM DO HORÁRIO ATUALIZADO ---
         },
         defaultProducts: [
             { id: 1, name: 'Copo 300ml', price: 14.00, disabled: false, type: 'base_acai', description: 'Monte seu açaí com seus acompanhamentos preferidos.' },
             { id: 2, name: 'Copo 400ml', price: 17.00, disabled: false, type: 'base_acai', description: 'Monte seu açaí com seus acompanhamentos preferidos.' },
             { id: 3, name: 'Copo 500ml', price: 20.00, disabled: false, type: 'base_acai', description: 'Monte seu açaí com seus acompanhamentos preferidos.' },
-            { id: 22, name: 'Barca de Açaí (P)', price: 55.00, disabled: false, type: 'base_acai', description: 'Monte sua barca com até 7 ingredientes e 2 caldas!', customToppingLimits: { free: 7, caldas: 2 } },
+            /* BARCA REMOVIDA: { id: 22, name: 'Barca de Açaí (P)', price: 55.00, disabled: false, type: 'base_acai', description: 'Monte sua barca com até 7 ingredientes e 2 caldas!', customToppingLimits: { free: 7, caldas: 2 } }, */
             { id: 5, name: 'Diet Granola', disabled: false, type: 'combo_selectable_size', description: 'Sugestão: granola, leite em pó, leite condensado', sizesKey: 'cupSizes' },
             { id: 6, name: 'Refrescante', disabled: false, type: 'combo_selectable_size', description: 'Sugestão: sorvete, calda de chocolate, leite em pó, leite condensado', sizesKey: 'cupSizes' },
             { id: 7, name: 'Mega Especial', disabled: false, type: 'combo_selectable_size', description: 'Sugestão: leite em pó, leite condensado, banana, creme de avelã (Nutella)', sizesKey: 'cupSizes' },
@@ -606,30 +628,34 @@
 
         getNextOpeningDate() {
             const now = new Date();
-            const [openHour, openMinute] = app.adminSettings.openingTime.split(':').map(Number);
+            let nextOpening = null;
             
-            // Check for opening later today
-            if (app.adminSettings.openDays.includes(now.getDay())) {
-                const openingTimeToday = new Date();
-                openingTimeToday.setHours(openHour, openMinute, 0, 0);
-                if (now < openingTimeToday) {
-                    return openingTimeToday;
-                }
+            // 1. Check if the store opens later today
+            const todayHours = app.adminSettings.dailyHours[now.getDay()];
+            const [openHour, openMinute] = todayHours.open.split(':').map(Number);
+            const openingTimeToday = new Date();
+            openingTimeToday.setHours(openHour, openMinute, 0, 0);
+
+            if (now < openingTimeToday) {
+                return openingTimeToday;
             }
-            
-            // Find the next open day
+
+            // 2. Find the next open day
             for (let i = 1; i <= 7; i++) {
                 const nextDate = new Date();
                 nextDate.setDate(now.getDate() + i);
                 const nextDayOfWeek = nextDate.getDay();
                 
-                if (app.adminSettings.openDays.includes(nextDayOfWeek)) {
-                    nextDate.setHours(openHour, openMinute, 0, 0);
+                const nextDayHours = app.adminSettings.dailyHours[nextDayOfWeek];
+                
+                if (app.adminSettings.openDays.includes(nextDayOfWeek) || nextDayHours) {
+                    const [nextOpenHour, nextOpenMinute] = nextDayHours.open.split(':').map(Number);
+                    nextDate.setHours(nextOpenHour, nextOpenMinute, 0, 0);
                     return nextDate;
                 }
             }
             
-            return null; // Should not happen if at least one day is open
+            return null; 
         },
 
         // --- LOCAL STORAGE FUNCTIONS ---
@@ -662,7 +688,18 @@
         },
         loadLocalData() {
             const savedSettings = localStorage.getItem(app.ADMIN_SETTINGS_STORAGE_KEY);
-            app.adminSettings = savedSettings ? { ...app.defaultAdminSettings, ...JSON.parse(savedSettings) } : app.defaultAdminSettings;
+            let loadedSettings = savedSettings ? JSON.parse(savedSettings) : {};
+            
+            // Merge loaded settings with defaults, ensuring dailyHours structure
+            app.adminSettings = { 
+                ...app.defaultAdminSettings, 
+                ...loadedSettings,
+                dailyHours: app.defaultAdminSettings.dailyHours.map((defaultHours, index) => ({
+                    ...defaultHours,
+                    ...loadedSettings.dailyHours?.[index]
+                }))
+            };
+            
             const savedProducts = localStorage.getItem(app.PRODUCTS_STORAGE_KEY);
             app.products = savedProducts ? JSON.parse(savedProducts) : app.defaultProducts;
             const savedToppings = localStorage.getItem(app.TOPPINGS_STORAGE_KEY);
@@ -695,24 +732,44 @@
         // --- STORE STATUS & COUNTDOWN LOGIC ---
         renderStoreHoursDisplay() {
             const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-            let daysString = "Fechado";
-            if (app.adminSettings.openDays.length === 7) daysString = "Todos os dias";
-            else if (app.adminSettings.openDays.length > 0) {
-                daysString = app.adminSettings.openDays.sort((a, b) => a - b).map(dayIndex => dayNames[dayIndex]).join(', ');
+            
+            // Simplificando a exibição do horário para o novo formato
+            const weekday = app.adminSettings.dailyHours[1]; // Horário de Seg
+            const weekend = app.adminSettings.dailyHours[6]; // Horário de Sáb/Dom
+            
+            let hoursString = '';
+
+            if (weekday.open === weekend.open && weekday.close === weekend.close) {
+                 hoursString = `Todos os dias: ${weekday.open} às ${weekday.close}`;
+            } else {
+                 hoursString = `Seg-Sex: ${weekday.open} às ${weekday.close} | Sáb/Dom: ${weekend.open} às ${weekend.close}`;
             }
-            app.elements.storeHoursDisplay.textContent = `${app.adminSettings.openingTime} às ${app.adminSettings.closingTime} (${daysString})`;
+
+            app.elements.storeHoursDisplay.textContent = hoursString;
         },
 
         startClosingCountdown() {
             if (app.countdownInterval) clearInterval(app.countdownInterval);
             
-            const [closeHour, closeMinute] = app.adminSettings.closingTime.split(':').map(Number);
+            const now = new Date();
+            const currentDay = now.getDay();
+            const todayHours = app.adminSettings.dailyHours[currentDay];
+            
+            if (!todayHours) {
+                app.stopClosingCountdown();
+                return;
+            }
+
+            const [closeHour, closeMinute] = todayHours.close.split(':').map(Number);
             const targetTime = new Date();
             targetTime.setHours(closeHour, closeMinute, 0, 0);
 
-            // Se o horário de fechamento já passou hoje, significa que é no dia seguinte (loja vira a noite)
-            if (targetTime < new Date()) {
-                targetTime.setDate(targetTime.getDate() + 1);
+            // Se o horário de fechamento já passou hoje, e o horário de fechamento é ANTES do horário de abertura, 
+            // significa que a loja fecha no próximo dia (não é o caso aqui, mas mantido por segurança)
+            // No cenário atual (fecha sempre antes da meia-noite), se já passou, para o contador.
+            if (targetTime < now) {
+                app.stopClosingCountdown();
+                return;
             }
 
             app.elements.closingTimerContainer.classList.remove('hidden');
@@ -724,7 +781,7 @@
 
                 if (diff <= 0) {
                     app.stopClosingCountdown();
-                    app.checkStoreStatus(); // Re-verifica o status, que agora deve ser "fechado"
+                    app.checkStoreStatus(); 
                     return;
                 }
 
@@ -759,7 +816,7 @@
 
                 if (diff <= 0) {
                     app.stopOpeningCountdown();
-                    app.checkStoreStatus(); // Re-check status, it should be open now
+                    app.checkStoreStatus(); 
                     return;
                 }
 
@@ -777,7 +834,7 @@
                 app.elements.openingTimer.textContent = timerString;
             };
             
-            updateTimer(); // Initial call
+            updateTimer(); 
             app.openingCountdownInterval = setInterval(updateTimer, 1000);
         },
 
@@ -793,8 +850,10 @@
 
             const now = new Date();
             const currentDay = now.getDay();
-            const isWeekend = (currentDay === 0 || currentDay === 6);
-            const deliveryStartTimeStr = isWeekend ? app.adminSettings.weekendDeliveryStartTime : app.adminSettings.weekdayDeliveryStartTime;
+            
+            const deliveryStartTimeStr = currentDay === 0 || currentDay === 6 
+                ? app.adminSettings.weekendDeliveryStartTime 
+                : app.adminSettings.weekdayDeliveryStartTime;
             
             const [deliveryHour, deliveryMinute] = deliveryStartTimeStr.split(':').map(Number);
             const targetTime = new Date();
@@ -839,25 +898,32 @@
         checkStoreStatus() {
             const now = new Date();
             const currentDay = now.getDay();
-            
+            const todayHours = app.adminSettings.dailyHours[currentDay];
+
             if (app.adminSettings.storeStatus === 'open') app.isStoreOpen = true;
             else if (app.adminSettings.storeStatus === 'closed') app.isStoreOpen = false;
             else {
-                const isTodayOpenDay = app.adminSettings.openDays.includes(currentDay);
-                if (!isTodayOpenDay) app.isStoreOpen = false;
-                else {
-                    const [openHour, openMinute] = app.adminSettings.openingTime.split(':').map(Number);
-                    const [closeHour, closeMinute] = app.adminSettings.closingTime.split(':').map(Number);
+                // Cálculo de status baseado em dailyHours
+                if (!todayHours) {
+                    app.isStoreOpen = false;
+                } else {
+                    const [openHour, openMinute] = todayHours.open.split(':').map(Number);
+                    const [closeHour, closeMinute] = todayHours.close.split(':').map(Number);
                     const openTime = openHour * 60 + openMinute;
                     const closeTime = closeHour * 60 + closeMinute;
                     const currentTime = now.getHours() * 60 + now.getMinutes();
+
+                    // Caso o fechamento seja no dia seguinte (não o caso atual, mas mantido)
                     if (closeTime < openTime) app.isStoreOpen = (currentTime >= openTime || currentTime <= closeTime);
+                    // Caso normal (fechamento no mesmo dia)
                     else app.isStoreOpen = (currentTime >= openTime && currentTime <= closeTime);
                 }
             }
             
-            const isWeekend = (currentDay === 0 || currentDay === 6);
-            const deliveryStartTimeStr = isWeekend ? app.adminSettings.weekendDeliveryStartTime : app.adminSettings.weekdayDeliveryStartTime;
+            const deliveryStartTimeStr = currentDay === 0 || currentDay === 6 
+                ? app.adminSettings.weekendDeliveryStartTime 
+                : app.adminSettings.weekdayDeliveryStartTime;
+                
             const [deliveryStartHour, deliveryStartMinute] = deliveryStartTimeStr.split(':').map(Number);
             const deliveryStartTime = deliveryStartHour * 60 + deliveryStartMinute;
             const currentTime = now.getHours() * 60 + now.getMinutes();
@@ -914,7 +980,8 @@
                 const isCombo = product.type === 'combo_selectable_size';
                 const isCup = product.name.toLowerCase().includes('copo');
                 const isKit = product.name.toLowerCase().includes('kit') || product.name.toLowerCase().includes('namorados') || product.name.toLowerCase().includes('kids');
-                const isBarca = product.name.toLowerCase().includes('barca');
+                /* A barca foi removida, o trecho abaixo é redundante, mas mantido por segurança:
+                const isBarca = product.name.toLowerCase().includes('barca'); */
 
                 let onclickHandler = product.disabled ? '' : (isCombo ? `onclick="app.openComboSizeModal('${product.id}')"` : `onclick="app.openItemModal('${product.id}', ${product.price}, '')"`);
                 
@@ -930,9 +997,11 @@
                 let cardContainerClasses = (isCup || isKit) 
                     ? 'border-2 border-pink-500 shadow-lg shadow-pink-500/20'
                     : 'border border-gray-700';
+                /* Removendo a lógica da barca:
                 if (isBarca) {
                     cardContainerClasses = 'border-2 border-amber-400 shadow-lg shadow-amber-400/20';
                 }
+                */
                 const spanClass = '';
 
                 const isMostOrdered = mostOrderedIds.includes(product.id);
@@ -1381,7 +1450,7 @@
         },
         closeAdminModal() { app.closeModal(app.elements.adminModal); },
         renderAdminPanel() { /* ... Logic from original script, intentionally omitted for brevity but is unchanged ... */ },
-        saveAdminChanges() { /* ... Logic from original script, intentionally omitted for brevity but is unchanged ... */ },
+        saveAdminChanges() { app.showAlert('As configurações foram salvas.', 'Salvo'); app.closeAdminModal(); },
         resetToDefaults() { /* ... Logic from original script, intentionally omitted for brevity but is unchanged ... */ },
 
         // --- FAKE ONLINE COUNTER ---
@@ -1459,7 +1528,7 @@
                 app.currentItem.customToppingLimits = product.customToppingLimits;
             }
 
-            app.elements.modalTitle.textContent = sizeName ? `Monte seu ${product.name} (${sizeName})` : `Monte sua ${product.name}`;
+            app.elements.modalTitle.textContent = sizeName ? `Monte seu ${product.name} (${sizeName})` : `Monte seu ${product.name}`;
             
             // Adiciona o seletor de quantidade primeiro
             app.elements.modalBody.innerHTML = `
@@ -1635,7 +1704,7 @@
             app.toggleDeliveryFields();
         },
         // --- ADMIN PANEL (Functionality unchanged, UI kept separate) ---
-        renderAdminPanel() { app.elements.adminBody.innerHTML = `<p class="text-center">A interface do painel de administração foi mantida funcional e não segue o tema escuro.</p><p class="text-center mt-4">Clique em "Salvar" para aplicar as configurações atuais ou "Restaurar" para limpar os dados.</p>`; },
+        renderAdminPanel() { app.elements.adminBody.innerHTML = `<p class="text-center">A interface do painel de administrador foi mantida funcional e não segue o tema escuro.</p><p class="text-center mt-4">Clique em "Salvar" para aplicar as configurações atuais ou "Restaurar" para limpar os dados.</p>`; },
         saveAdminChanges() { app.showAlert('As configurações foram salvas.', 'Salvo'); app.closeAdminModal(); },
         resetToDefaults() {
             localStorage.clear();
@@ -1649,8 +1718,9 @@
             
             // =========================================================
             //  MODIFICAÇÃO PARA LIBERAR DELIVERY DURANTE O FERIADO
+            //  ESTA LÓGICA FOI MANTIDA DO CÓDIGO ANTERIOR, MAS COM OS NOVOS HORÁRIOS
             // =========================================================
-            const isHoliday = true; // DEFINIR COMO 'false' APÓS O FERIADO
+            const isHoliday = false; // DEFINIR COMO 'false' APÓS O FERIADO
             if (isHoliday) {
                 // Força o horário de início do delivery para 00:00, liberando-o assim que a loja abre
                 app.adminSettings.weekdayDeliveryStartTime = '00:00';
@@ -1661,7 +1731,7 @@
 
             app.loadCart();
             app.loadCustomerInfo();
-            app.loadCouponHistory(); // CARREGA HISTÓRICO DE CUPONS
+            app.loadCouponHistory(); 
             
             const whatsappUrl = `https://wa.me/${app.adminSettings.whatsappNumber}`;
             app.elements.storeAddressDisplay.textContent = app.adminSettings.address;

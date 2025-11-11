@@ -468,7 +468,7 @@
             
             // --- HORÁRIO ATUALIZADO ---
             // Os horários de abertura e fechamento são dinâmicos dependendo do dia
-            // Os dias abertos são todos, mas com horários diferentes
+            // Os dias openDays são todos, mas com horários diferentes
             openDays: [0, 1, 2, 3, 4, 5, 6], 
             
             // Será usado para o banner de abertura/fechamento
@@ -497,7 +497,7 @@
             { id: 1, name: 'Copo 300ml', price: 14.00, disabled: false, type: 'base_acai', description: 'Monte seu açaí com seus acompanhamentos preferidos.' },
             { id: 2, name: 'Copo 400ml', price: 17.00, disabled: false, type: 'base_acai', description: 'Monte seu açaí com seus acompanhamentos preferidos.' },
             { id: 3, name: 'Copo 500ml', price: 20.00, disabled: false, type: 'base_acai', description: 'Monte seu açaí com seus acompanhamentos preferidos.' },
-            /* BARCA REMOVIDA: { id: 22, name: 'Barca de Açaí (P)', price: 55.00, disabled: false, type: 'base_acai', description: 'Monte sua barca com até 7 ingredientes e 2 caldas!', customToppingLimits: { free: 7, caldas: 2 } }, */
+            // A barca (id: 22) foi removida aqui
             { id: 5, name: 'Diet Granola', disabled: false, type: 'combo_selectable_size', description: 'Sugestão: granola, leite em pó, leite condensado', sizesKey: 'cupSizes' },
             { id: 6, name: 'Refrescante', disabled: false, type: 'combo_selectable_size', description: 'Sugestão: sorvete, calda de chocolate, leite em pó, leite condensado', sizesKey: 'cupSizes' },
             { id: 7, name: 'Mega Especial', disabled: false, type: 'combo_selectable_size', description: 'Sugestão: leite em pó, leite condensado, banana, creme de avelã (Nutella)', sizesKey: 'cupSizes' },
@@ -521,11 +521,11 @@
             { name: '400ml', price: 17.00 },
             { name: '500ml', price: 20.00 }
         ],
-        // --- FUSÃO IMPLEMENTADA: paid_tier2 ELIMINADA, ITENS MOVIDOS PARA 'free' E PREÇO ZERADO ---
         defaultToppings: {
             free: {
+                // ALTERADO: LIMITE DE 7 PARA 3
                 title: '🍒 Acompanhamentos (Frutas, Cremes, Grãos, Doces - Tudo Grátis, escolha até 3)', 
-                limit: 3, 
+                limit: 3, // <--- ESTE VALOR FOI ALTERADO PARA 3
                 price: 0.00, 
                 items: [
                     // Itens antigos 'free'
@@ -980,8 +980,6 @@
                 const isCombo = product.type === 'combo_selectable_size';
                 const isCup = product.name.toLowerCase().includes('copo');
                 const isKit = product.name.toLowerCase().includes('kit') || product.name.toLowerCase().includes('namorados') || product.name.toLowerCase().includes('kids');
-                /* A barca foi removida, o trecho abaixo é redundante, mas mantido por segurança:
-                const isBarca = product.name.toLowerCase().includes('barca'); */
 
                 let onclickHandler = product.disabled ? '' : (isCombo ? `onclick="app.openComboSizeModal('${product.id}')"` : `onclick="app.openItemModal('${product.id}', ${product.price}, '')"`);
                 
@@ -997,11 +995,7 @@
                 let cardContainerClasses = (isCup || isKit) 
                     ? 'border-2 border-pink-500 shadow-lg shadow-pink-500/20'
                     : 'border border-gray-700';
-                /* Removendo a lógica da barca:
-                if (isBarca) {
-                    cardContainerClasses = 'border-2 border-amber-400 shadow-lg shadow-amber-400/20';
-                }
-                */
+                
                 const spanClass = '';
 
                 const isMostOrdered = mostOrderedIds.includes(product.id);
@@ -1555,8 +1549,8 @@
 
                 // Customiza o subtítulo para cada categoria
                 if (key === 'free') { 
-                    categoryTitle = category.title; 
-                    subtitle = `(Tudo liberado e grátis. Escolha ${currentLimit} no total)`;
+                    categoryTitle = `🍒 Acompanhamentos`; 
+                    subtitle = `(Tudo liberado e grátis. Escolha ${currentLimit} no total)`; // Subtítulo atualizado
                 } else if (key === 'caldas') {
                     categoryTitle = `🍯 Caldas`;
                     subtitle = `(Grátis, escolha ${currentLimit} para finalizar)`;
